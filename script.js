@@ -1,10 +1,13 @@
-console.log("--- script.js HAS STARTED EXECUTING ---"); // Diagnostic log at the very top
+console.log("--- script.js HAS STARTED EXECUTING ---");
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import * as TWEEN from './tween.esm.min.js'; // This imports TWEEN.js from your local file
+import * as TWEEN from './tween.esm.min.js'; 
 
+// Import preset managers
+import { loadCameraPresets, getCameraPreset, getCameraPresetNames } from './presets/camera/camera_presets_manager.js';
+import { loadGridPresets, getGridPreset, getGridPresetNames } from './presets/grid/grid_presets_manager.js';
 
 // --- Global variables for Three.js objects ---
 let scene, camera, renderer, controls, gridHelper, directionalLight;
@@ -12,54 +15,32 @@ let currentModel = null;
 let isSceneInitialized = false; 
 
 const viewportContainer = document.getElementById('viewport-container');
-const loadModelBtn = document.getElementById('loadModelBtn'); // Get the button element reference
+const loadModelBtn = document.getElementById('loadModelBtn'); 
+const cameraAngleSelect = document.getElementById('cameraAngleSelect');
+const applyCameraAngleBtn = document.getElementById('applyCameraAngle');
+const gridSizeSelect = document.getElementById('gridSizeSelect');
+const applyGridSizeBtn = document.getElementById('applyGridSize');
+const sunAzimuth = document.getElementById('sunAzimuth');
+const sunElevation = document.getElementById('sunElevation');
+const sunAzimuthValueSpan = document.getElementById('sunAzimuthValue');
+const sunElevationValueSpan = document.getElementById('sunElevationValue');
 
 
-// Camera Presets - These define the *desired angle and distance relative to the model*
-const CAMERA_PRESETS = {
-    // Tiberian Sun - Attempting direct conversion from your Blender screenshot data
-    tiberianSun: {
-        // Blender Camera Location (X, Y, Z): (1.79616, -1.78978, 1.73212)
-        // Converted to Three.js (X, Z, -Y): (1.79616, 1.73212, 1.78978)
-        // This vector is a relative position to the model's center. It will be scaled.
-        basePosition: new THREE.Vector3(1.79616, 1.73212, 1.78978),
-        // This multiplier will scale the `basePosition` vector. You will likely need to adjust this.
-        // A higher number means the camera is further away, making the model appear smaller.
-        // Start with 10, then adjust up/down.
-        positionScaleMultiplier: 10, 
+// --- No more hardcoded CAMERA_PRESETS or GRID_PRESETS here! ---
 
-        // Blender Camera Rotation (Quaternion WXYZ): (0.977, 0.000, 0.000, 0.214)
-        // Converted to Three.js Quaternion (XYZW): (0.000, 0.000, 0.214, 0.977)
-        rotationQuaternion: new THREE.Quaternion(0.000, 0.000, 0.214, 0.977)
-    },
-    // Red Alert 2 - Keeping the previous general isometric approach for now
-    redAlert2: {
-        positionOffset: new THREE.Vector3(1, 0.8, 1).normalize(), 
-        distanceRatio: 3.5, 
-        rotation: new THREE.Euler(-Math.atan(1 / Math.sqrt(3)), Math.PI / 4, 0, 'YXZ') 
-    }
-};
-
-// Grid Presets (kept same as last successful iteration)
-const GRID_PRESETS = {
-    tiberianSun: {
-        size: 100,      
-        divisions: 20, 
-        colorCenterLine: 0x444444, 
-        colorGrid: 0x888888       
-    },
-    redAlert2: {
-        size: 150,
-        divisions: 15,
-        colorCenterLine: 0x333333,
-        colorGrid: 0x666666
-    }
-};
 
 // --- Initialization functions ---
 
-function init() {
+async function init() { // Make init() async because it will load presets
     console.log("INIT: Starting Three.js initialization.");
+    
+    // --- Load Presets First ---
+    await loadCameraPresets();
+    await loadGridPresets();
+    populatePresetDropdowns(); // Populate dropdowns after presets are loaded
+    console.log("INIT: All presets loaded and dropdowns populated.");
+
+
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111);
 
@@ -83,7 +64,7 @@ function init() {
     controls.maxPolarAngle = Math.PI / 2; 
     console.log("INIT: Controls set up.");
 
-    // Apply initial camera preset AFTER controls are initialized, looking at origin
+    // Apply initial camera preset (default to 'tiberianSun')
     applyCameraPreset('tiberianSun', new THREE.Vector3(0,0,0)); 
     console.log("INIT: Initial camera preset applied.");
 
@@ -92,10 +73,10 @@ function init() {
     scene.add(ambientLight);
 
     directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); 
-    directionalLight.position.set(-0.8005, -10.1766, 12.2700); // Blender TS light position
-    directionalLight.intensity = 4.0; // Blender TS light strength
+    directionalLight.position.set(-0.8005, -10.1766, 12.2700); 
+    directionalLight.intensity = 4.0; 
     directionalLight.castShadow = true;
-    directionalLight.target.position.set(0, 0, 0); // Light points at the origin
+    directionalLight.target.position.set(0, 0, 0); 
     scene.add(directionalLight);
     scene.add(directionalLight.target); 
     console.log("INIT: Lights added.");
@@ -112,7 +93,7 @@ function init() {
 
 
     // Grid Helper
-    addGridHelper('tiberianSun');
+    addGridHelper('tiberianSun'); // Default to Tiberian Sun grid
     console.log("INIT: Grid helper added.");
 
     // Handle Window Resizing
@@ -121,7 +102,7 @@ function init() {
     isSceneInitialized = true;
     console.log("INIT: isSceneInitialized set to true.");
 
-    // Attach load model button listener and enable it here, AFTER init is complete
+    // Attach load model button listener and enable it here
     if (loadModelBtn) {
         loadModelBtn.addEventListener('click', () => {
             if (!isSceneInitialized) { 
@@ -172,6 +153,36 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
     renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
 }
+
+// --- Dynamic Preset Dropdown Population ---
+function populatePresetDropdowns() {
+    // Populate Camera Angle Select
+    const cameraPresetNames = getCameraPresetNames();
+    cameraAngleSelect.innerHTML = ''; // Clear existing options
+    cameraPresetNames.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()); // "tiberianSun" -> "Tiberian Sun"
+        if (name === 'tiberianSun') { // Set default selection
+            option.selected = true;
+        }
+        cameraAngleSelect.appendChild(option);
+    });
+
+    // Populate Grid Size Select
+    const gridPresetNames = getGridPresetNames();
+    gridSizeSelect.innerHTML = ''; // Clear existing options
+    gridPresetNames.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        if (name === 'tiberianSun') { // Set default selection
+            option.selected = true;
+        }
+        gridSizeSelect.appendChild(option);
+    });
+}
+
 
 // --- Model Loading ---
 const loader = new GLTFLoader(); 
@@ -234,7 +245,7 @@ function loadModel(url) {
             console.log("LOAD MODEL: Model added to scene.");
 
             const modelCenter = new THREE.Vector3(0,0,0); // Model is centered at origin
-            applyCameraPreset(cameraAngleSelect.value, modelCenter); 
+            applyCameraPreset(cameraAngleSelect.value, modelCenter); // Apply the currently selected camera preset
             console.log('LOAD MODEL: Camera framed model using current preset.');
 
             console.log('Final Model Object:', currentModel);
@@ -251,9 +262,6 @@ function loadModel(url) {
 
 // --- Settings Logic ---
 
-const cameraAngleSelect = document.getElementById('cameraAngleSelect');
-const applyCameraAngleBtn = document.getElementById('applyCameraAngle');
-
 if (applyCameraAngleBtn) {
     applyCameraAngleBtn.addEventListener('click', () => {
         if (!isSceneInitialized) { console.warn("WARN: Scene not initialized for camera angle."); return; }
@@ -263,75 +271,70 @@ if (applyCameraAngleBtn) {
     });
 }
 
-// Function now explicitly sets camera position AND rotation based on preset type
+// Function applies camera position and rotation based on preset type
 function applyCameraPreset(presetName, targetPosition = new THREE.Vector3(0,0,0)) {
     if (!camera || !controls || !TWEEN) { 
         console.warn("WARN: Camera, controls, or TWEEN not initialized for camera preset.");
         return;
     }
-    const preset = CAMERA_PRESETS[presetName];
-    if (preset) {
-        let modelMaxDim = 50; 
-        if (currentModel) {
-            const box = new THREE.Box3().setFromObject(currentModel);
-            const size = box.getSize(new THREE.Vector3());
-            modelMaxDim = Math.max(size.x, size.y, size.z);
-        }
-        
-        let newPosition;
-        let targetQuaternion;
-
-        // Determine which type of preset is being used (Blender-converted vs. generic isometric)
-        if (preset.basePosition && preset.rotationQuaternion) {
-            // This path is for the Tiberian Sun preset, using Blender-converted data
-            // We scale the Blender basePosition by a factor to match our 50-unit model scale
-            // The '5' here is an arbitrary divisor to make the multiplier more manageable;
-            // it means we want the camera to be, for instance, 10 * (model's max dim / 5) away from the model.
-            // The 'positionScaleMultiplier' (e.g., 10) further scales this.
-            // Adjust 'positionScaleMultiplier' in CAMERA_PRESETS to get desired distance/zoom.
-            const scalingFactor = modelMaxDim / 5; // Example scaling: 5 Blender units is 1 of our scaled units
-            newPosition = preset.basePosition.clone().multiplyScalar(preset.positionScaleMultiplier || scalingFactor).add(targetPosition);
-            targetQuaternion = preset.rotationQuaternion.clone();
-            
-            console.log(`DEBUG: Applying Blender-converted position: (${newPosition.x.toFixed(2)}, ${newPosition.y.toFixed(2)}, ${newPosition.z.toFixed(2)}) and Quaternion.`);
-
-        } else if (preset.positionOffset && preset.rotation) {
-            // This path is for other presets (like Red Alert 2), using generic isometric logic
-            const desiredDistance = modelMaxDim * preset.distanceRatio;
-            newPosition = preset.positionOffset.clone().multiplyScalar(desiredDistance).add(targetPosition);
-            targetQuaternion = new THREE.Quaternion().setFromEuler(preset.rotation);
-            console.log(`DEBUG: Applying generic isometric position and rotation.`);
-
-        } else {
-            console.warn("WARN: Invalid camera preset configuration for:", presetName);
-            return;
-        }
-
-        // Animate camera position
-        new TWEEN.Tween(camera.position)
-            .to(newPosition, 1000)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .start();
-
-        // Animate camera quaternion
-        new TWEEN.Tween(camera.quaternion)
-            .to({ _x: targetQuaternion.x, _y: targetQuaternion.y, _z: targetQuaternion.z, _w: targetQuaternion.w }, 1000)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .onUpdate(() => {
-                camera.lookAt(targetPosition); // Keep camera looking at target during rotation
-                controls.target.copy(targetPosition); // Keep controls looking at target during rotation
-                controls.update();
-            })
-            .start();
-        
-        // Ensure controls target is explicitly set after animation starts
-        controls.target.copy(targetPosition);
-        controls.update(); 
+    const preset = getCameraPreset(presetName); // Get preset from manager
+    if (!preset) {
+        console.warn("WARN: Camera preset not found:", presetName);
+        return;
     }
-}
 
-const gridSizeSelect = document.getElementById('gridSizeSelect');
-const applyGridSizeBtn = document.getElementById('applyGridSize');
+    let modelMaxDim = 50; 
+    if (currentModel) {
+        const box = new THREE.Box3().setFromObject(currentModel);
+        const size = box.getSize(new THREE.Vector3());
+        modelMaxDim = Math.max(size.x, size.y, size.z);
+    }
+    
+    let newPosition;
+    let targetQuaternion;
+
+    // Determine which type of preset is being used (Blender-converted vs. generic isometric)
+    if (preset.basePosition && preset.rotationQuaternion) {
+        // This path is for the Tiberian Sun preset, using Blender-converted data
+        // Adjust positionScaleMultiplier in the preset file to control zoom/distance.
+        newPosition = preset.basePosition.clone().multiplyScalar(preset.positionScaleMultiplier).add(targetPosition);
+        targetQuaternion = preset.rotationQuaternion.clone();
+        
+        console.log(`DEBUG: Applying Blender-converted position: (${newPosition.x.toFixed(2)}, ${newPosition.y.toFixed(2)}, ${newPosition.z.toFixed(2)}) and Quaternion.`);
+
+    } else if (preset.positionOffset && preset.rotation) {
+        // This path is for other presets (like Red Alert 2), using generic isometric logic
+        const desiredDistance = modelMaxDim * preset.distanceRatio;
+        newPosition = preset.positionOffset.clone().multiplyScalar(desiredDistance).add(targetPosition);
+        targetQuaternion = new THREE.Quaternion().setFromEuler(preset.rotation);
+        console.log(`DEBUG: Applying generic isometric position and rotation.`);
+
+    } else {
+        console.warn("WARN: Invalid camera preset configuration for:", presetName);
+        return;
+    }
+
+    // Animate camera position
+    new TWEEN.Tween(camera.position)
+        .to(newPosition, 1000)
+        .easing(TWEEN.Easing.Quadratic.Out)
+        .start();
+
+    // Animate camera quaternion
+    new TWEEN.Tween(camera.quaternion)
+        .to({ _x: targetQuaternion.x, _y: targetQuaternion.y, _z: targetQuaternion.z, _w: targetQuaternion.w }, 1000)
+        .easing(TWEEN.Easing.Quadratic.Out)
+        .onUpdate(() => {
+            camera.lookAt(targetPosition); 
+            controls.target.copy(targetPosition); 
+            controls.update();
+        })
+        .start();
+    
+    // Ensure controls target is explicitly set after animation starts
+    controls.target.copy(targetPosition);
+    controls.update(); 
+}
 
 if (applyGridSizeBtn) {
     applyGridSizeBtn.addEventListener('click', () => {
@@ -352,8 +355,13 @@ function addGridHelper(presetName) {
         if (gridHelper.material) gridHelper.material.dispose();
     }
 
-    const preset = GRID_PRESETS[presetName];
-    if (preset) {
+    const preset = getGridPreset(presetName); // Get preset from manager
+    if (!preset) {
+        console.warn("WARN: Grid preset not found:", presetName);
+        return;
+    }
+
+    if (preset) { // Check again in case getGridPreset returned undefined
         gridHelper = new THREE.GridHelper(
             preset.size,
             preset.divisions,

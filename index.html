@@ -10,7 +10,6 @@
     <div id="app-container">
         <div id="viewer-panel">
             <div id="viewer-header">
-                <!-- Button starts DISABLED by HTML attribute -->
                 <button id="loadModelBtn" disabled>Load GLB/GLTF Model</button>
             </div>
             <div id="viewport-container">
@@ -22,19 +21,15 @@
 
             <div class="setting-group">
                 <label for="cameraAngleSelect">Camera Angle:</label>
-                <select id="cameraAngleSelect">
-                    <option value="tiberianSun" selected>Tiberian Sun</option>
-                    <option value="redAlert2">Red Alert 2</option>
-                </select>
+                <!-- Options will be added by JavaScript -->
+                <select id="cameraAngleSelect"></select> 
                 <button id="applyCameraAngle">Apply</button>
             </div>
 
             <div class="setting-group">
                 <label for="gridSizeSelect">Grid Size:</label>
-                <select id="gridSizeSelect">
-                    <option value="tiberianSun" selected>Tiberian Sun</option>
-                    <option value="redAlert2">Red Alert 2</option>
-                </select>
+                <!-- Options will be added by JavaScript -->
+                <select id="gridSizeSelect"></select>
                 <button id="applyGridSize">Apply</button>
             </div>
 
@@ -48,9 +43,7 @@
         </div>
     </div>
 
-    <!-- This loads the ES Module Shims, which allows the importmap to work. -->
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
-    <!-- The importmap defines how 'three' and 'three/addons/' are resolved. -->
     <script type="importmap">
         {
             "imports": {
@@ -59,7 +52,6 @@
             }
         }
     </script>
-    <!-- Your main script, loaded as a module. It will import TWEEN.js locally. -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
