@@ -3,9 +3,8 @@ console.log("--- script.js HAS STARTED EXECUTING ---"); // Diagnostic log at the
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-// <<< THE CRITICAL CHANGE FOR TWEEN.JS >>>
-// Import TWEEN.js directly as an ES Module from your local file.
-// The `* as TWEEN` syntax means all exports from tween.esm.min.js will be available under the 'TWEEN' object.
+// <<< THE DEFINITIVE TWEEN.JS IMPORT >>>
+// This *must* be the only way TWEEN is referenced or loaded.
 import * as TWEEN from './tween.esm.min.js'; 
 
 
@@ -353,7 +352,7 @@ function updateSunDirection() {
 if (sunAzimuth) sunAzimuth.addEventListener('input', updateSunDirection);
 if (sunElevation) sunElevation.addEventListener('input', updateSunDirection);
 
-// <<< CRITICAL: Call init() directly as soon as the script parses.
+// Call init() directly as soon as the script parses.
 // All imports (Three.js and TWEEN.js) are handled by the module system at the top.
 init(); 
 console.log("SCRIPT: init() called from main script body.");
