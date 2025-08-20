@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // --- Global variables for Three.js objects ---
 let scene, camera, renderer, controls, gridHelper, directionalLight;
 let currentModel = null; // To keep track of the loaded model
-let isSceneInitialized = false; // New flag to track initialization
+let isSceneInitialized = false; // <<< CRITICAL: New flag to track initialization
 
 const viewportContainer = document.getElementById('viewport-container');
 const loadModelBtn = document.getElementById('loadModelBtn'); // Get the button element
@@ -17,7 +17,8 @@ const CAMERA_PRESETS = {
         lookAt: new THREE.Vector3(0, 0, 0)
     },
     redAlert2: {
-        position: new THREE.Vector3(70, 40, 70), // Placeholder for Red Alert 2 settings
+        // Placeholder for Red Alert 2 settings
+        position: new THREE.Vector3(70, 40, 70), // Example: More isometric
         lookAt: new THREE.Vector3(0, 0, 0)
     }
 };
@@ -41,42 +42,42 @@ const GRID_PRESETS = {
 function init() {
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111111); // Dark background
+    scene.background = new THREE.Color(0x111111);
 
     // Camera
     camera = new THREE.PerspectiveCamera(75, viewportContainer.clientWidth / viewportContainer.clientHeight, 0.1, 1000);
-    applyCameraPreset('tiberianSun'); // Default camera
+    applyCameraPreset('tiberianSun'); // Default camera view
 
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.shadowMap.enabled = true; // Enable shadow maps
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     viewportContainer.appendChild(renderer.domElement);
 
     // Controls
     controls = new OrbitControls(camera, renderer.domElement);
-    controls.listenToKeyEvents(window); // Optional: enable keyboard shortcuts
-    controls.enableDamping = true; // For a smoother feel
+    controls.listenToKeyEvents(window);
+    controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.screenSpacePanning = false; // Prevents pan from pushing object off screen
+    controls.screenSpacePanning = false;
     controls.minDistance = 1;
     controls.maxDistance = 500;
-    controls.maxPolarAngle = Math.PI / 2; // Limit vertical rotation to prevent going below ground
+    controls.maxPolarAngle = Math.PI / 2;
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     scene.add(ambientLight);
 
-    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // White light
-    // Use the Blender TS light position as the initial position
+    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // Create directional light
+    // Set initial position based on Tiberian Sun light settings
     directionalLight.position.set(-0.8005, -10.1766, 12.2700);
-    directionalLight.intensity = 4.0; // Set power/strength from Blender settings
-    directionalLight.castShadow = true; // This light will cast shadows
+    directionalLight.intensity = 4.0;
+    directionalLight.castShadow = true;
     directionalLight.target.position.set(0, 0, 0); // Light points at the origin
     scene.add(directionalLight);
-    scene.add(directionalLight.target); // It's good practice to add target to scene
+    scene.add(directionalLight.target); // Good practice to add target to scene if its position is manipulated
 
     // Configure shadow properties
     directionalLight.shadow.mapSize.width = 2048;
@@ -95,16 +96,18 @@ function init() {
     // Handle Window Resizing
     window.addEventListener('resize', onWindowResize, false);
 
-    // Set flag and enable UI elements AFTER scene is ready
+    // <<< CRITICAL: Set flag and enable UI elements AFTER scene is ready
     isSceneInitialized = true;
-    loadModelBtn.disabled = false; // Enable the button
-    // Now call updateSunDirection to ensure sliders match the light and vice-versa
-    // For initial load, we want the sun to be at the Blender TS position.
-    // If you want sliders to control this immediately, you'd need to inverse-calculate
-    // azimuth/elevation from the blender (x,y,z) and set slider values.
-    // For now, sliders will start at default (45,60) and can then modify the light.
-    // No need to call updateSunDirection() here unless you want to override the Blender setup.
-    // Let's remove the final updateSunDirection() for now, as init() sets the Blender values.
+    if (loadModelBtn) { // Safety check if button element exists
+        loadModelBtn.disabled = false; // Enable the button
+    }
+    // Now that directionalLight is guaranteed to exist,
+    // call updateSunDirection to apply initial slider values to the light.
+    // NOTE: This will override the Blender TS light position set above if sliders
+    // don't match it. If you want the Blender position to be fixed initially,
+    // and sliders just to be for *later* adjustment, you might not call this here.
+    // For immediate slider functionality on load, keep this.
+    updateSunDirection(); // <<< CRITICAL: Call after init() to ensure light exists
 
     // Initial Render
     animate();
@@ -113,7 +116,7 @@ function init() {
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
-    if (typeof TWEEN !== 'undefined') { // Check if TWEEN is loaded
+    if (typeof TWEEN !== 'undefined') {
         TWEEN.update();
     }
     renderer.render(scene, camera);
@@ -128,33 +131,41 @@ function onWindowResize() {
 // --- Model Loading ---
 const loader = new GLTFLoader();
 
-loadModelBtn.addEventListener('click', () => {
-    // Only proceed if scene is initialized
-    if (!isSceneInitialized) {
-        console.warn("Scene not initialized yet. Please wait.");
-        return;
-    }
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.glb, .gltf';
-    input.onchange = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const url = e.target.result;
-                loadModel(url);
-            };
-            reader.readAsDataURL(file);
+// <<< CRITICAL: Added safety check for scene initialization
+if (loadModelBtn) { // Ensure button exists before adding listener
+    loadModelBtn.addEventListener('click', () => {
+        if (!isSceneInitialized) { // <<< CRITICAL: Only proceed if scene is initialized
+            console.warn("Scene not initialized yet. Please wait.");
+            return; // Exit early if not ready
         }
-    };
-    input.click(); // Programmatically click the hidden input
-});
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.glb, .gltf';
+        input.onchange = (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const url = e.target.result;
+                    loadModel(url);
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+        input.click(); // Programmatically click the hidden input
+    });
+}
+
 
 function loadModel(url) {
-    // Ensure scene is available before attempting to remove from it
-    if (currentModel && scene) {
-        scene.remove(currentModel);
+    // <<< CRITICAL: Ensure scene is available before attempting to remove from it
+    if (!scene) {
+        console.error("Scene not available to load/remove model!");
+        return;
+    }
+
+    if (currentModel) {
+        scene.remove(currentModel); // This line caused TypeError if scene was undefined
         currentModel.traverse((object) => {
             if (object.geometry) object.geometry.dispose();
             if (object.material) {
@@ -164,7 +175,7 @@ function loadModel(url) {
                     object.material.dispose();
                 }
             }
-            if (object.texture) object.texture.dispose(); // For textures directly on objects
+            if (object.texture) object.texture.dispose();
             if (object.material && object.material.map) object.material.map.dispose();
             if (object.material && object.material.lightMap) object.material.lightMap.dispose();
             if (object.material && object.material.aoMap) object.material.aoMap.dispose();
@@ -196,15 +207,11 @@ function loadModel(url) {
                 }
             });
 
-            // Ensure scene is valid before adding to it
-            if (scene) {
-                scene.add(currentModel);
-            } else {
-                console.error("Scene not available to add model!");
-                return;
-            }
+            // Ensure scene is valid before adding to it (redundant if !scene check at start of function)
+            scene.add(currentModel);
 
 
+            // Update bounding box after scaling for accurate camera framing
             box.setFromObject(currentModel);
             box.getCenter(center);
             box.getSize(size);
@@ -238,12 +245,19 @@ function loadModel(url) {
 const cameraAngleSelect = document.getElementById('cameraAngleSelect');
 const applyCameraAngleBtn = document.getElementById('applyCameraAngle');
 
-applyCameraAngleBtn.addEventListener('click', () => {
-    if (!isSceneInitialized) return; // Prevent action if not initialized
-    applyCameraPreset(cameraAngleSelect.value);
-});
+if (applyCameraAngleBtn) { // Safety check
+    applyCameraAngleBtn.addEventListener('click', () => {
+        if (!isSceneInitialized) return; // Prevent action if not initialized
+        applyCameraPreset(cameraAngleSelect.value);
+    });
+}
 
 function applyCameraPreset(presetName) {
+    // <<< CRITICAL: Ensure camera and controls exist before using
+    if (!camera || !controls) {
+        console.warn("Camera or controls not initialized for camera preset.");
+        return;
+    }
     const preset = CAMERA_PRESETS[presetName];
     if (preset) {
         new TWEEN.Tween(camera.position)
@@ -263,13 +277,16 @@ function applyCameraPreset(presetName) {
 const gridSizeSelect = document.getElementById('gridSizeSelect');
 const applyGridSizeBtn = document.getElementById('applyGridSize');
 
-applyGridSizeBtn.addEventListener('click', () => {
-    if (!isSceneInitialized) return; // Prevent action if not initialized
-    addGridHelper(gridSizeSelect.value);
-});
+if (applyGridSizeBtn) { // Safety check
+    applyGridSizeBtn.addEventListener('click', () => {
+        if (!isSceneInitialized) return; // Prevent action if not initialized
+        addGridHelper(gridSizeSelect.value);
+    });
+}
 
 function addGridHelper(presetName) {
-    if (!scene) { // Also check scene here
+    // <<< CRITICAL: Also check scene here
+    if (!scene) {
         console.warn("Scene not available for grid helper.");
         return;
     }
@@ -299,7 +316,8 @@ const sunAzimuthValueSpan = document.getElementById('sunAzimuthValue');
 const sunElevationValueSpan = document.getElementById('sunElevationValue');
 
 function updateSunDirection() {
-    if (!directionalLight) { // Crucial check: only update if light exists
+    // <<< CRITICAL: Check if directionalLight exists before trying to use it
+    if (!directionalLight) {
         console.warn("Directional light not initialized yet for sun settings.");
         return;
     }
@@ -322,12 +340,9 @@ function updateSunDirection() {
     directionalLight.target.updateMatrixWorld();
 }
 
-sunAzimuth.addEventListener('input', updateSunDirection);
-sunElevation.addEventListener('input', updateSunDirection);
-
-// Initial call to updateSunDirection moved to after init().
-// For initial load, the light position is set directly in init() using Blender values.
-// The sliders (45, 60) will update the light from there when manipulated.
+// Attach listeners only if elements exist
+if (sunAzimuth) sunAzimuth.addEventListener('input', updateSunDirection);
+if (sunElevation) sunElevation.addEventListener('input', updateSunDirection);
 
 
 // --- TWEEN.js for smooth camera animation ---
@@ -336,17 +351,13 @@ const script = document.createElement('script');
 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.min.js';
 script.onload = () => {
     // Initialize the Three.js scene once TWEEN is loaded
-    init(); // This is called *after* TWEEN is ready
-    // Now that init() has run and directionalLight exists,
-    // we can call updateSunDirection IF you want the sliders to reflect the Blender angles
-    // or set the light based on sliders *immediately*.
-    // If init() already sets the light as per Blender, this call will overwrite it based on slider defaults.
-    // For now, let's keep it here so the UI elements are immediately functional.
-    updateSunDirection(); // Call after init() to ensure light exists
+    init(); // This is called *after* TWEEN is ready and guarantees Three.js objects exist.
+    // Call updateSunDirection *after* init() has populated directionalLight
+    updateSunDirection(); // <<< CRITICAL: Ensures light is set and sliders are synced post-init
 };
 document.head.appendChild(script);
 
-// Optionally, initially disable the load button in HTML to prevent early clicks
-// index.html: <button id="loadModelBtn" disabled>Load GLB/GLTF Model</button>
-// And then enable it in script.js after init()
-loadModelBtn.disabled = true; // Set initial state in JS if not in HTML
+// <<< CRITICAL: Set initial state of the button
+if (loadModelBtn) { // Safety check for button existence
+    loadModelBtn.disabled = true; // Initially disable the button until init() enables it
+}
