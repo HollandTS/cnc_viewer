@@ -2,6 +2,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+// TWEEN.js needs to be globally available before init is called
+// So we ensure it's loaded before we initialize Three.js
+// This part remains outside any function to ensure its global scope.
+// The init() call moves inside the script.onload for TWEEN.
+// This is already handled at the very end of your script.js
+// So, just ensure this is consistent.
+
 // --- Scene Setup ---
 let scene, camera, renderer, controls, gridHelper, directionalLight;
 let currentModel = null; // To keep track of the loaded model
@@ -11,11 +18,15 @@ const viewportContainer = document.getElementById('viewport-container');
 // Camera Presets
 const CAMERA_PRESETS = {
     tiberianSun: {
-        position: new THREE.Vector3(50, 60, 50), // Example: Adjusted for a good view
+        // These are just example values, you'll replace them
+        // with your actual C&C inspired coords.
+        position: new THREE.Vector3(50, 60, 50),
         lookAt: new THREE.Vector3(0, 0, 0)
     },
     redAlert2: {
-        position: new THREE.Vector3(70, 40, 70), // Example: More isometric
+        // These are just example values, you'll replace them
+        // with your actual C&C inspired coords.
+        position: new THREE.Vector3(70, 40, 70),
         lookAt: new THREE.Vector3(0, 0, 0)
     }
 };
@@ -43,6 +54,8 @@ function init() {
 
     // Camera
     camera = new THREE.PerspectiveCamera(75, viewportContainer.clientWidth / viewportContainer.clientHeight, 0.1, 1000);
+    // Note: We apply the preset AFTER the model loads if we want it to frame the model.
+    // For now, let's keep it here for an initial view.
     applyCameraPreset('tiberianSun'); // Default camera
 
     // Renderer
@@ -100,6 +113,10 @@ function init() {
 function animate() {
     requestAnimationFrame(animate);
     controls.update(); // only required if controls.enableDamping or controls.autoRotate are set to true
+    // TWEEN.js update must be called in the animation loop
+    if (typeof TWEEN !== 'undefined') { // Check if TWEEN is loaded
+        TWEEN.update();
+    }
     renderer.render(scene, camera);
 }
 
@@ -134,6 +151,7 @@ function loadModel(url) {
     if (currentModel) {
         scene.remove(currentModel);
         currentModel.traverse((object) => {
+            // Dispose of geometries, materials, and textures to prevent memory leaks
             if (object.geometry) object.geometry.dispose();
             if (object.material) {
                 if (Array.isArray(object.material)) {
@@ -142,7 +160,7 @@ function loadModel(url) {
                     object.material.dispose();
                 }
             }
-            if (object.texture) object.texture.dispose();
+            if (object.texture) object.texture.dispose(); // For textures directly on objects
         });
         currentModel = null;
     }
@@ -152,33 +170,53 @@ function loadModel(url) {
         (gltf) => {
             currentModel = gltf.scene;
 
+            // --- IMPORTANT: Enable shadows and adjust position/scale ---
+            // Calculate bounding box to center and scale the model
+            const box = new THREE.Box3().setFromObject(currentModel);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+
+            // Center the model in the scene
+            currentModel.position.sub(center);
+
+            // Optional: Scale the model to fit a certain size (e.g., within a 100 unit cube)
+            // This is crucial if models come in wildly different scales.
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const targetSize = 50; // A reasonable size for our viewer (e.g., 50 units wide)
+            const scaleFactor = targetSize / maxDim;
+            currentModel.scale.setScalar(scaleFactor);
+            // After scaling, recenter relative to the new scale
+            currentModel.position.multiplyScalar(scaleFactor);
+
+
             // Make all parts of the model cast and receive shadows
             currentModel.traverse((node) => {
                 if (node.isMesh) {
                     node.castShadow = true;
                     node.receiveShadow = true;
+                    // If materials use textures, dispose them too when removing the model
+                    if (node.material && node.material.map) node.material.map.dispose();
+                    if (node.material && node.material.lightMap) node.material.lightMap.dispose();
+                    if (node.material && node.material.aoMap) node.material.aoMap.dispose();
+                    // Add more texture types as needed (emissiveMap, normalMap, etc.)
                 }
             });
 
             scene.add(currentModel);
 
-            // Optional: Fit camera to loaded model
-            const box = new THREE.Box3().setFromObject(currentModel);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
+            // Adjust camera position to frame the new, centered, and scaled model
+            // Re-calculate box and center/size after scaling for accurate camera framing
+            box.setFromObject(currentModel);
+            box.getCenter(center);
+            box.getSize(size);
 
-            // Adjust camera position to frame the model
-            const maxDim = Math.max(size.x, size.y, size.z);
+            const frameMaxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
-            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+            let cameraDistance = Math.abs(frameMaxDim / 2 / Math.tan(fov / 2));
 
-            // Add some padding
-            cameraZ *= 1.5; // Example padding
-
-            // Set camera position relative to model's center
-            camera.position.copy(center);
-            camera.position.z += cameraZ;
-            camera.position.y += cameraZ * 0.7; // Lift camera slightly
+            // Add some padding and lift for a better view
+            cameraDistance *= 1.8; // Example padding
+            camera.position.set(center.x + cameraDistance, center.y + cameraDistance * 0.7, center.z + cameraDistance);
             camera.lookAt(center);
 
             controls.target.copy(center); // Update controls target to model center
@@ -220,12 +258,13 @@ function applyCameraPreset(presetName) {
             })
             .start();
             // Start the animation loop for TWEEN
-            function animateTween() {
-                if (TWEEN.update()) {
-                    requestAnimationFrame(animateTween);
-                }
-            }
-            animateTween();
+            // This is no longer needed here if TWEEN.update() is called in the main animate loop
+            // function animateTween() {
+            //     if (TWEEN.update()) {
+            //         requestAnimationFrame(animateTween);
+            //     }
+            // }
+            // animateTween();
     }
 }
 
@@ -241,7 +280,9 @@ applyGridSizeBtn.addEventListener('click', () => {
 function addGridHelper(presetName) {
     if (gridHelper) {
         scene.remove(gridHelper);
-        gridHelper.dispose(); // Release memory
+        // Dispose of the grid helper's geometry and material
+        if (gridHelper.geometry) gridHelper.geometry.dispose();
+        if (gridHelper.material) gridHelper.material.dispose();
     }
 
     const preset = GRID_PRESETS[presetName];
@@ -276,14 +317,14 @@ function updateSunDirection() {
 
     // Calculate light position using spherical coordinates
     // r is arbitrary, just defines distance from origin
-    const r = 50;
+    const r = 50; // Distance of the light from the origin
     const x = r * Math.sin(elevationRad) * Math.cos(azimuthRad);
     const y = r * Math.cos(elevationRad); // Y is 'up' in Three.js
     const z = r * Math.sin(elevationRad) * Math.sin(azimuthRad);
 
     directionalLight.position.set(x, y, z);
     directionalLight.target.position.set(0,0,0); // Light always points at the origin
-    directionalLight.target.updateMatrixWorld();
+    directionalLight.target.updateMatrixWorld(); // Important for shadow updates
 }
 
 sunAzimuth.addEventListener('input', updateSunDirection);
