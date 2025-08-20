@@ -3,7 +3,7 @@ console.log("--- script.js HAS STARTED EXECUTING ---"); // Diagnostic log at the
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import * as TWEEN from './tween.esm.min.js'; // <<< This imports TWEEN.js from your local file
+import * as TWEEN from './tween.esm.min.js'; // This imports TWEEN.js from your local file
 
 
 // --- Global variables for Three.js objects ---
@@ -17,31 +17,34 @@ const loadModelBtn = document.getElementById('loadModelBtn'); // Get the button 
 
 // Camera Presets - These define the *desired angle and distance relative to the model*
 const CAMERA_PRESETS = {
-    // Tiberian Sun - Aiming for a classic isometric RTS angle
+    // Tiberian Sun - Attempting direct conversion from your Blender screenshot data
     tiberianSun: {
-        // This vector defines the direction from the target (model center) to the camera
-        // A (1,1,1) direction gives a common isometric look in a Y-up system if scaled correctly.
-        positionOffset: new THREE.Vector3(1, 1, 1).normalize(), // Direction vector (e.g., top-right-front)
-        distanceRatio: 2.0, // Multiplier for model's largest dimension to set camera distance
-        // The rotation needed to look at the center from this offset position.
-        // -Math.atan(1 / Math.sqrt(2)) is approx -35.26 degrees (pitch down)
-        // Math.PI / 4 is 45 degrees (yaw to the right)
-        // 'YXZ' order means rotation around Y, then X, then Z. Common for game cameras.
-        rotation: new THREE.Euler(-Math.atan(1 / Math.sqrt(2)), Math.PI / 4, 0, 'YXZ') 
+        // Blender Camera Location (X, Y, Z): (1.79616, -1.78978, 1.73212)
+        // Converted to Three.js (X, Z, -Y): (1.79616, 1.73212, 1.78978)
+        // This vector is a relative position to the model's center. It will be scaled.
+        basePosition: new THREE.Vector3(1.79616, 1.73212, 1.78978),
+        // This multiplier will scale the `basePosition` vector. You will likely need to adjust this.
+        // A higher number means the camera is further away, making the model appear smaller.
+        // Start with 10, then adjust up/down.
+        positionScaleMultiplier: 10, 
+
+        // Blender Camera Rotation (Quaternion WXYZ): (0.977, 0.000, 0.000, 0.214)
+        // Converted to Three.js Quaternion (XYZW): (0.000, 0.000, 0.214, 0.977)
+        rotationQuaternion: new THREE.Quaternion(0.000, 0.000, 0.214, 0.977)
     },
-    // Red Alert 2 - Perhaps a slightly flatter, less vertical view
+    // Red Alert 2 - Keeping the previous general isometric approach for now
     redAlert2: {
-        positionOffset: new THREE.Vector3(1, 0.8, 1).normalize(), // Slightly flatter angle
-        distanceRatio: 2.2, // Maybe slightly further out
-        rotation: new THREE.Euler(-Math.atan(1 / Math.sqrt(3)), Math.PI / 4, 0, 'YXZ') // Approx -30 degrees pitch
+        positionOffset: new THREE.Vector3(1, 0.8, 1).normalize(), 
+        distanceRatio: 3.5, 
+        rotation: new THREE.Euler(-Math.atan(1 / Math.sqrt(3)), Math.PI / 4, 0, 'YXZ') 
     }
 };
 
-// Grid Presets
+// Grid Presets (kept same as last successful iteration)
 const GRID_PRESETS = {
     tiberianSun: {
-        size: 100,      // Total size of the grid (e.g., 100x100 units)
-        divisions: 1000, // Number of divisions across the size (1000 divisions over 100 units = 0.1 unit per cell)
+        size: 100,      
+        divisions: 20, 
         colorCenterLine: 0x444444, 
         colorGrid: 0x888888       
     },
@@ -61,7 +64,6 @@ function init() {
     scene.background = new THREE.Color(0x111111);
 
     camera = new THREE.PerspectiveCamera(75, viewportContainer.clientWidth / viewportContainer.clientHeight, 0.1, 1000);
-    // Camera position will be set by applyCameraPreset (called AFTER controls)
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
@@ -78,7 +80,7 @@ function init() {
     controls.screenSpacePanning = false;
     controls.minDistance = 1;
     controls.maxDistance = 500;
-    controls.maxPolarAngle = Math.PI / 2; // Limit vertical rotation to prevent going below ground
+    controls.maxPolarAngle = Math.PI / 2; 
     console.log("INIT: Controls set up.");
 
     // Apply initial camera preset AFTER controls are initialized, looking at origin
@@ -95,7 +97,7 @@ function init() {
     directionalLight.castShadow = true;
     directionalLight.target.position.set(0, 0, 0); // Light points at the origin
     scene.add(directionalLight);
-    scene.add(directionalLight.target); // It's good practice to add target to scene
+    scene.add(directionalLight.target); 
     console.log("INIT: Lights added.");
 
     // Configure shadow properties
@@ -149,7 +151,7 @@ function init() {
         console.error("INIT: loadModelBtn element not found!");
     }
 
-    updateSunDirection(); // Update sun visuals based on current slider positions
+    updateSunDirection(); 
     console.log("INIT: updateSunDirection called.");
 
     // Initial Render
@@ -217,7 +219,6 @@ function loadModel(url) {
             const targetSize = 50; // Our scene's target size for loaded models (e.g. 50x50x50 units)
             const scaleFactor = targetSize / maxDim;
             currentModel.scale.setScalar(scaleFactor);
-            // currentModel.position is already at 0,0,0 after centering, so no need to scale it again.
             
             console.log("LOAD MODEL: Model centered and scaled. New scaleFactor:", scaleFactor);
 
@@ -232,9 +233,7 @@ function loadModel(url) {
             scene.add(currentModel);
             console.log("LOAD MODEL: Model added to scene.");
 
-            // Update controls target and camera position to frame the new model
             const modelCenter = new THREE.Vector3(0,0,0); // Model is centered at origin
-            // Apply the currently selected camera preset to frame the new model
             applyCameraPreset(cameraAngleSelect.value, modelCenter); 
             console.log('LOAD MODEL: Camera framed model using current preset.');
 
@@ -258,31 +257,55 @@ const applyCameraAngleBtn = document.getElementById('applyCameraAngle');
 if (applyCameraAngleBtn) {
     applyCameraAngleBtn.addEventListener('click', () => {
         if (!isSceneInitialized) { console.warn("WARN: Scene not initialized for camera angle."); return; }
-        // When applying a preset from UI, apply it relative to current model's center if loaded, else origin
         const currentTarget = currentModel ? controls.target.clone() : new THREE.Vector3(0,0,0); 
         applyCameraPreset(cameraAngleSelect.value, currentTarget);
         console.log("SETTINGS: Camera angle applied:", cameraAngleSelect.value);
     });
 }
 
-// Function now accepts a target for the camera to look at
+// Function now explicitly sets camera position AND rotation based on preset type
 function applyCameraPreset(presetName, targetPosition = new THREE.Vector3(0,0,0)) {
-    if (!camera || !controls) { 
-        console.warn("WARN: Camera or controls not initialized for camera preset.");
+    if (!camera || !controls || !TWEEN) { 
+        console.warn("WARN: Camera, controls, or TWEEN not initialized for camera preset.");
         return;
     }
     const preset = CAMERA_PRESETS[presetName];
     if (preset) {
-        let modelMaxDim = 50; // Default size for camera distance calculation if no model
+        let modelMaxDim = 50; 
         if (currentModel) {
-            // Recalculate model's bounding box after our scaling
             const box = new THREE.Box3().setFromObject(currentModel);
             const size = box.getSize(new THREE.Vector3());
             modelMaxDim = Math.max(size.x, size.y, size.z);
         }
         
-        const desiredDistance = modelMaxDim * preset.distanceRatio;
-        const newPosition = preset.positionOffset.clone().multiplyScalar(desiredDistance).add(targetPosition);
+        let newPosition;
+        let targetQuaternion;
+
+        // Determine which type of preset is being used (Blender-converted vs. generic isometric)
+        if (preset.basePosition && preset.rotationQuaternion) {
+            // This path is for the Tiberian Sun preset, using Blender-converted data
+            // We scale the Blender basePosition by a factor to match our 50-unit model scale
+            // The '5' here is an arbitrary divisor to make the multiplier more manageable;
+            // it means we want the camera to be, for instance, 10 * (model's max dim / 5) away from the model.
+            // The 'positionScaleMultiplier' (e.g., 10) further scales this.
+            // Adjust 'positionScaleMultiplier' in CAMERA_PRESETS to get desired distance/zoom.
+            const scalingFactor = modelMaxDim / 5; // Example scaling: 5 Blender units is 1 of our scaled units
+            newPosition = preset.basePosition.clone().multiplyScalar(preset.positionScaleMultiplier || scalingFactor).add(targetPosition);
+            targetQuaternion = preset.rotationQuaternion.clone();
+            
+            console.log(`DEBUG: Applying Blender-converted position: (${newPosition.x.toFixed(2)}, ${newPosition.y.toFixed(2)}, ${newPosition.z.toFixed(2)}) and Quaternion.`);
+
+        } else if (preset.positionOffset && preset.rotation) {
+            // This path is for other presets (like Red Alert 2), using generic isometric logic
+            const desiredDistance = modelMaxDim * preset.distanceRatio;
+            newPosition = preset.positionOffset.clone().multiplyScalar(desiredDistance).add(targetPosition);
+            targetQuaternion = new THREE.Quaternion().setFromEuler(preset.rotation);
+            console.log(`DEBUG: Applying generic isometric position and rotation.`);
+
+        } else {
+            console.warn("WARN: Invalid camera preset configuration for:", presetName);
+            return;
+        }
 
         // Animate camera position
         new TWEEN.Tween(camera.position)
@@ -290,13 +313,9 @@ function applyCameraPreset(presetName, targetPosition = new THREE.Vector3(0,0,0)
             .easing(TWEEN.Easing.Quadratic.Out)
             .start();
 
-        // Animate camera rotation (directly setting Euler angles)
-        // Create a temporary quaternion from the desired Euler rotation
-        const newQuaternion = new THREE.Quaternion().setFromEuler(preset.rotation);
-        
         // Animate camera quaternion
         new TWEEN.Tween(camera.quaternion)
-            .to({ _x: newQuaternion.x, _y: newQuaternion.y, _z: newQuaternion.z, _w: newQuaternion.w }, 1000)
+            .to({ _x: targetQuaternion.x, _y: targetQuaternion.y, _z: targetQuaternion.z, _w: targetQuaternion.w }, 1000)
             .easing(TWEEN.Easing.Quadratic.Out)
             .onUpdate(() => {
                 camera.lookAt(targetPosition); // Keep camera looking at target during rotation
