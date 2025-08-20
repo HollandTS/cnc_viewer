@@ -3,9 +3,7 @@ console.log("--- script.js HAS STARTED EXECUTING ---"); // Diagnostic log at the
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-// <<< THE DEFINITIVE TWEEN.JS IMPORT >>>
-// This *must* be the only way TWEEN is referenced or loaded.
-import * as TWEEN from './tween.esm.min.js'; 
+import * as TWEEN from './tween.esm.min.js'; // The successful local TWEEN import
 
 
 // --- Global variables for Three.js objects ---
@@ -14,7 +12,8 @@ let currentModel = null;
 let isSceneInitialized = false; 
 
 const viewportContainer = document.getElementById('viewport-container');
-const loadModelBtn = document.getElementById('loadModelBtn');
+const loadModelBtn = document.getElementById('loadModelBtn'); // Get the button element here, it will be used later
+
 
 // Camera Presets
 const CAMERA_PRESETS = {
@@ -44,7 +43,7 @@ const GRID_PRESETS = {
     }
 };
 
-// --- Initialization functions (remain mostly same) ---
+// --- Initialization functions ---
 
 function init() {
     console.log("INIT: Starting Three.js initialization.");
@@ -52,9 +51,9 @@ function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111);
 
-    // Camera
+    // Camera - Defined first
     camera = new THREE.PerspectiveCamera(75, viewportContainer.clientWidth / viewportContainer.clientHeight, 0.1, 1000);
-    applyCameraPreset('tiberianSun');
+    // applyCameraPreset will be called AFTER controls are set up
 
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -65,7 +64,7 @@ function init() {
     viewportContainer.appendChild(renderer.domElement);
     console.log("INIT: Renderer appended to viewport.");
 
-    // Controls
+    // Controls - Defined here, after camera and renderer
     controls = new OrbitControls(camera, renderer.domElement);
     controls.listenToKeyEvents(window);
     controls.enableDamping = true;
@@ -74,6 +73,12 @@ function init() {
     controls.minDistance = 1;
     controls.maxDistance = 500;
     controls.maxPolarAngle = Math.PI / 2;
+    console.log("INIT: Controls set up.");
+
+
+    // Camera Preset - Called AFTER controls are initialized
+    applyCameraPreset('tiberianSun'); // Moved here
+    console.log("INIT: Initial camera preset applied.");
 
     // Lights
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
@@ -108,12 +113,37 @@ function init() {
 
     isSceneInitialized = true;
     console.log("INIT: isSceneInitialized set to true.");
+
+    // <<< CRITICAL: Attach button listener and enable it here, AFTER init is complete
     if (loadModelBtn) {
-        loadModelBtn.disabled = false; // <<< Enable the button
-        console.log("INIT: Load Model button enabled.");
+        loadModelBtn.addEventListener('click', () => {
+            if (!isSceneInitialized) { // Double-check just in case of weird async timing
+                console.warn("WARN: Scene not initialized yet. Cannot load model.");
+                return;
+            }
+            console.log("CLICK: Load Model button clicked. Scene is initialized.");
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.glb, .gltf';
+            input.onchange = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const url = e.target.result;
+                        loadModel(url);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+            input.click();
+        });
+        loadModelBtn.disabled = false; // <<< Enable the button here
+        console.log("INIT: Load Model button listener attached and enabled.");
     } else {
-        console.warn("INIT: loadModelBtn element not found!");
+        console.error("INIT: loadModelBtn element not found!");
     }
+
 
     updateSunDirection();
     console.log("INIT: updateSunDirection called.");
@@ -126,7 +156,7 @@ function init() {
 function animate() {
     requestAnimationFrame(animate);
     if (controls) controls.update();
-    TWEEN.update(); // TWEEN is now directly imported, no typeof check needed
+    TWEEN.update(); 
     if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
@@ -138,38 +168,10 @@ function onWindowResize() {
 }
 
 // --- Model Loading ---
-const loader = new GLTFLoader(); // GLTFLoader is imported at the top now
-
-if (loadModelBtn) {
-    loadModelBtn.addEventListener('click', () => {
-        if (!isSceneInitialized) {
-            console.warn("WARN: Scene not initialized yet. Cannot load model.");
-            return;
-        }
-        console.log("CLICK: Load Model button clicked. Scene is initialized.");
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.glb, .gltf';
-        input.onchange = (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const url = e.target.result;
-                    loadModel(url);
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-        input.click();
-    });
-} else {
-    console.warn("WARN: loadModelBtn element not found at script start.");
-}
-
+const loader = new GLTFLoader(); 
 
 function loadModel(url) {
-    if (!scene || !loader) { // Check for scene AND loader instance
+    if (!scene || !loader) { 
         console.error("ERROR: Scene or GLTFLoader not available to load model!");
         return;
     }
@@ -353,14 +355,13 @@ if (sunAzimuth) sunAzimuth.addEventListener('input', updateSunDirection);
 if (sunElevation) sunElevation.addEventListener('input', updateSunDirection);
 
 // Call init() directly as soon as the script parses.
-// All imports (Three.js and TWEEN.js) are handled by the module system at the top.
 init(); 
 console.log("SCRIPT: init() called from main script body.");
 
-// Set initial state of the button
-if (loadModelBtn) {
-    loadModelBtn.disabled = true; // Disabled initially
-    console.log("INITIAL: Load Model button set to disabled.");
+// Set initial state of the button. This part is critical for enabling.
+// Note: The listener and disabled=false moved INTO init()
+if (loadModelBtn) { // This log is just for initial parsing feedback
+    console.log("INITIAL: loadModelBtn element found during initial parse. Will be handled in init().");
 } else {
     console.error("CRITICAL ERROR: loadModelBtn element not found on page load. Check index.html ID.");
 }
