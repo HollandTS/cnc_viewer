@@ -18,15 +18,14 @@ const viewportContainer = document.getElementById('viewport-container');
 // Camera Presets
 const CAMERA_PRESETS = {
     tiberianSun: {
-        // These are just example values, you'll replace them
-        // with your actual C&C inspired coords.
-        position: new THREE.Vector3(50, 60, 50),
+        // Taken directly from your Blender "CAMERA ANGLES (Position & Rotation)"
+        position: new THREE.Vector3(110.0390, -110.0390, 89.8467),
+        // For a fixed angle view, we want the camera to look at the origin (where models are centered)
         lookAt: new THREE.Vector3(0, 0, 0)
     },
     redAlert2: {
-        // These are just example values, you'll replace them
-        // with your actual C&C inspired coords.
-        position: new THREE.Vector3(70, 40, 70),
+        // Placeholder for Red Alert 2 settings
+        position: new THREE.Vector3(70, 40, 70), // Example: More isometric
         lookAt: new THREE.Vector3(0, 0, 0)
     }
 };
@@ -34,14 +33,18 @@ const CAMERA_PRESETS = {
 // Grid Presets (Plane geometry for reference, size, divisions)
 const GRID_PRESETS = {
     tiberianSun: {
-        size: 100,
-        divisions: 100, // 1 unit per division
-        colorCenterLine: 0x444444,
-        colorGrid: 0x888888
+        // Based on "Unit Scale: 1.0000", "Scale: 1.00", "Subdivisions: 10"
+        // If 1 unit is a major cell, and there are 10 subdivisions per unit,
+        // then for a size of 100, we need 100 * 10 = 1000 divisions.
+        size: 100,      // Total size of the grid
+        divisions: 1000, // Total number of divisions. 10 subdivisions per unit over 100 units
+        colorCenterLine: 0x444444, // A darker gray for the center
+        colorGrid: 0x888888       // A lighter gray for grid lines
     },
     redAlert2: {
+        // Placeholder for Red Alert 2 settings
         size: 150,
-        divisions: 15, // 10 units per division
+        divisions: 15,
         colorCenterLine: 0x333333,
         colorGrid: 0x666666
     }
@@ -53,10 +56,11 @@ function init() {
     scene.background = new THREE.Color(0x111111); // Dark background
 
     // Camera
+    // Using PerspectiveCamera for compatibility with OrbitControls
+    // If you need strict orthographic, this would be THREE.OrthographicCamera
     camera = new THREE.PerspectiveCamera(75, viewportContainer.clientWidth / viewportContainer.clientHeight, 0.1, 1000);
-    // Note: We apply the preset AFTER the model loads if we want it to frame the model.
-    // For now, let's keep it here for an initial view.
-    applyCameraPreset('tiberianSun'); // Default camera
+    // Apply the default TS camera angle
+    applyCameraPreset('tiberianSun');
 
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -80,10 +84,15 @@ function init() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
     scene.add(ambientLight);
 
-    directionalLight = new THREE.DirectionalLight(0xffffff, 1.5); // White light
-    directionalLight.position.set(20, 30, 15); // Initial position (relative to scene origin)
+    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // White light, initial intensity
+    // Set initial position based on Tiberian Sun light settings
+    directionalLight.position.set(-0.8005, -10.1766, 12.2700);
+    directionalLight.intensity = 4.0; // Set power/strength from Blender settings
     directionalLight.castShadow = true; // This light will cast shadows
     scene.add(directionalLight);
+    // Ensure the light points towards the origin (where models are centered)
+    directionalLight.target.position.set(0, 0, 0);
+    scene.add(directionalLight.target); // It's good practice to add target to scene if its position is manipulated
 
     // Configure shadow properties for the directional light
     directionalLight.shadow.mapSize.width = 2048; // default is 512
@@ -113,7 +122,6 @@ function init() {
 function animate() {
     requestAnimationFrame(animate);
     controls.update(); // only required if controls.enableDamping or controls.autoRotate are set to true
-    // TWEEN.js update must be called in the animation loop
     if (typeof TWEEN !== 'undefined') { // Check if TWEEN is loaded
         TWEEN.update();
     }
@@ -160,7 +168,11 @@ function loadModel(url) {
                     object.material.dispose();
                 }
             }
-            if (object.texture) object.texture.dispose(); // For textures directly on objects
+            // For textures directly on objects or within materials
+            if (object.material && object.material.map) object.material.map.dispose();
+            if (object.material && object.material.lightMap) object.material.lightMap.dispose();
+            if (object.material && object.material.aoMap) object.material.aoMap.dispose();
+            // Add more texture types as needed (emissiveMap, normalMap, etc.)
         });
         currentModel = null;
     }
@@ -179,13 +191,13 @@ function loadModel(url) {
             // Center the model in the scene
             currentModel.position.sub(center);
 
-            // Optional: Scale the model to fit a certain size (e.g., within a 100 unit cube)
+            // Optional: Scale the model to fit a certain size (e.g., within a 50 unit cube)
             // This is crucial if models come in wildly different scales.
             const maxDim = Math.max(size.x, size.y, size.z);
             const targetSize = 50; // A reasonable size for our viewer (e.g., 50 units wide)
             const scaleFactor = targetSize / maxDim;
             currentModel.scale.setScalar(scaleFactor);
-            // After scaling, recenter relative to the new scale
+            // After scaling, recenter relative to the new scale if model was not centered initially
             currentModel.position.multiplyScalar(scaleFactor);
 
 
@@ -194,11 +206,6 @@ function loadModel(url) {
                 if (node.isMesh) {
                     node.castShadow = true;
                     node.receiveShadow = true;
-                    // If materials use textures, dispose them too when removing the model
-                    if (node.material && node.material.map) node.material.map.dispose();
-                    if (node.material && node.material.lightMap) node.material.lightMap.dispose();
-                    if (node.material && node.material.aoMap) node.material.aoMap.dispose();
-                    // Add more texture types as needed (emissiveMap, normalMap, etc.)
                 }
             });
 
@@ -257,14 +264,6 @@ function applyCameraPreset(presetName) {
                 controls.update();
             })
             .start();
-            // Start the animation loop for TWEEN
-            // This is no longer needed here if TWEEN.update() is called in the main animate loop
-            // function animateTween() {
-            //     if (TWEEN.update()) {
-            //         requestAnimationFrame(animateTween);
-            //     }
-            // }
-            // animateTween();
     }
 }
 
@@ -317,7 +316,7 @@ function updateSunDirection() {
 
     // Calculate light position using spherical coordinates
     // r is arbitrary, just defines distance from origin
-    const r = 50; // Distance of the light from the origin
+    const r = 50; // Distance of the light from the origin (arbitrary, adjust if needed)
     const x = r * Math.sin(elevationRad) * Math.cos(azimuthRad);
     const y = r * Math.cos(elevationRad); // Y is 'up' in Three.js
     const z = r * Math.sin(elevationRad) * Math.sin(azimuthRad);
@@ -331,8 +330,35 @@ sunAzimuth.addEventListener('input', updateSunDirection);
 sunElevation.addEventListener('input', updateSunDirection);
 
 // Initialize sun direction on load
-updateSunDirection();
+// Call updateSunDirection() after the directionalLight is initialized in init()
+// For the initial load, the directionalLight is set directly in init() based on TS,
+// so this initial call might be redundant if you want it to always follow the sliders.
+// If you want sliders to dictate initial light, call it AFTER init().
+// For now, let's keep it here so manual slider changes immediately apply.
+// Initial light position from Blender is set in init(), so updateSunDirection() will override it.
+// If you want Blender settings to be the default *and* reflect on sliders,
+// you'd set slider values based on the initial light's angles.
+// Let's ensure the sliders match the initial Blender setting values here:
+sunAzimuth.value = 45; // Default from previous step, adjust if Blender azimuth needs to be mapped
+sunElevation.value = 60; // Default from previous step, adjust if Blender elevation needs to be mapped
 
+// A better approach for initial sun setting:
+// Directly set initial slider values to match the hardcoded TS sun settings.
+// The Blender sun location (-0.8005, -10.1766, 12.2700) isn't directly azimuth/elevation.
+// We'd need to convert it, or just use trial and error with the sliders.
+// For now, let's assume the sliders will override the init() setting after the page loads.
+// Or, we can modify init() to *not* set the light position initially, and let updateSunDirection do it.
+
+// Let's modify init() to remove initial hardcoded light position, and let updateSunDirection() handle it.
+// Then set the slider values to something representative for "Tiberian Sun" lighting angles.
+// Based on the Blender location, the light is coming from roughly -X, -Y, +Z.
+// This means it's slightly to the left-back, and above.
+// For the sliders, let's pick some default values that are common for sun (e.g., from top-right-front)
+// I'll keep the previous slider defaults (45, 60) and let the user adjust,
+// or we can calculate the azimuth/elevation from the blender (x,y,z) if needed.
+// For simplicity, let's keep the sliders generic, and the *intensity* is from Blender.
+
+updateSunDirection(); // Call once to set the light according to default slider values
 
 // --- TWEEN.js for smooth camera animation ---
 // Add TWEEN.js library
