@@ -1,3 +1,5 @@
+console.log("--- script.js HAS STARTED EXECUTING ---"); // <<< NEW DIAGNOSTIC LINE
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -125,7 +127,6 @@ const loader = new GLTFLoader();
 
 if (loadModelBtn) {
     loadModelBtn.addEventListener('click', () => {
-        // No isSceneInitialized check here anymore.
         console.log("CLICK: Load Model button clicked."); // DIAGNOSTIC
         const input = document.createElement('input');
         input.type = 'file';
@@ -233,7 +234,7 @@ function loadModel(url) {
     );
 }
 
-// --- Settings Logic (with removed safety checks) ---
+// --- Settings Logic ---
 
 const cameraAngleSelect = document.getElementById('cameraAngleSelect');
 const applyCameraAngleBtn = document.getElementById('applyCameraAngle');
@@ -344,6 +345,4 @@ script.onerror = () => {
 };
 document.head.appendChild(script);
 
-// Ensure the button is enabled from the start by not disabling it in JS
-// The disabled attribute was removed from index.html in Step 1.
-console.log("SCRIPT: script.js finished initial parsing.");
+console.log("SCRIPT: script.js finished initial parsing."); // DIAGNOSTIC
