@@ -5,7 +5,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // --- Global variables for Three.js objects ---
 let scene, camera, renderer, controls, gridHelper, directionalLight;
 let currentModel = null;
-let isSceneInitialized = false;
 
 const viewportContainer = document.getElementById('viewport-container');
 const loadModelBtn = document.getElementById('loadModelBtn');
@@ -71,7 +70,7 @@ function init() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     scene.add(ambientLight);
 
-    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // Create directional light
     directionalLight.position.set(-0.8005, -10.1766, 12.2700);
     directionalLight.intensity = 4.0;
     directionalLight.castShadow = true;
@@ -98,16 +97,7 @@ function init() {
     // Handle Window Resizing
     window.addEventListener('resize', onWindowResize, false);
 
-    isSceneInitialized = true;
-    console.log("INIT: isSceneInitialized set to true."); // DIAGNOSTIC
-    if (loadModelBtn) {
-        loadModelBtn.disabled = false;
-        console.log("INIT: Load Model button enabled."); // DIAGNOSTIC
-    } else {
-        console.warn("INIT: loadModelBtn element not found!"); // DIAGNOSTIC
-    }
-
-    updateSunDirection(); // Call after init() to ensure light exists
+    updateSunDirection();
     console.log("INIT: updateSunDirection called."); // DIAGNOSTIC
 
     // Initial Render
@@ -133,14 +123,10 @@ function onWindowResize() {
 // --- Model Loading ---
 const loader = new GLTFLoader();
 
-// Attach listener only if button element exists
 if (loadModelBtn) {
     loadModelBtn.addEventListener('click', () => {
-        if (!isSceneInitialized) {
-            console.warn("WARN: Scene not initialized yet. Cannot load model.");
-            return;
-        }
-        console.log("CLICK: Load Model button clicked. Scene is initialized."); // DIAGNOSTIC
+        // No isSceneInitialized check here anymore.
+        console.log("CLICK: Load Model button clicked."); // DIAGNOSTIC
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.glb, .gltf';
@@ -247,21 +233,20 @@ function loadModel(url) {
     );
 }
 
-// --- Settings Logic (with added safety checks) ---
+// --- Settings Logic (with removed safety checks) ---
 
 const cameraAngleSelect = document.getElementById('cameraAngleSelect');
 const applyCameraAngleBtn = document.getElementById('applyCameraAngle');
 
 if (applyCameraAngleBtn) {
     applyCameraAngleBtn.addEventListener('click', () => {
-        if (!isSceneInitialized) { console.warn("WARN: Scene not initialized for camera angle."); return; }
         applyCameraPreset(cameraAngleSelect.value);
         console.log("SETTINGS: Camera angle applied:", cameraAngleSelect.value); // DIAGNOSTIC
     });
 }
 
 function applyCameraPreset(presetName) {
-    if (!camera || !controls || !TWEEN) { // Ensure TWEEN is also present
+    if (!camera || !controls || typeof TWEEN === 'undefined') { // Ensure TWEEN is also present
         console.warn("WARN: Camera, controls, or TWEEN not initialized for camera preset.");
         return;
     }
@@ -284,7 +269,6 @@ const applyGridSizeBtn = document.getElementById('applyGridSize');
 
 if (applyGridSizeBtn) {
     applyGridSizeBtn.addEventListener('click', () => {
-        if (!isSceneInitialized) { console.warn("WARN: Scene not initialized for grid size."); return; }
         addGridHelper(gridSizeSelect.value);
         console.log("SETTINGS: Grid size applied:", gridSizeSelect.value); // DIAGNOSTIC
     });
@@ -351,21 +335,15 @@ if (sunElevation) sunElevation.addEventListener('input', updateSunDirection);
 const script = document.createElement('script');
 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.min.js';
 script.onload = () => {
-    console.log("TWEEN: TWEEN.js loaded successfully. Calling init()."); // DIAGNOSTIC
-    init(); // This is called *after* TWEEN is ready and guarantees Three.js objects exist.
-    // updateSunDirection is called inside init() now.
+    console.log("TWEEN: TWEEN.js loaded successfully. Calling init().");
+    init(); // This is called *after* TWEEN is ready
 };
-script.onerror = () => { // DIAGNOSTIC: Add error handling for script loading
+script.onerror = () => {
     console.error("ERROR: Failed to load TWEEN.js from CDN. Check network or URL.");
     alert("Error: Core viewer components failed to load. Please check console.");
 };
 document.head.appendChild(script);
 
-// Set initial state of the button. This runs immediately when script.js is parsed.
-if (loadModelBtn) {
-    loadModelBtn.disabled = true;
-    console.log("INITIAL: Load Model button set to disabled."); // DIAGNOSTIC
-} else {
-    console.error("CRITICAL ERROR: loadModelBtn element not found on page load. Check index.html ID."); // DIAGNOSTIC
-}
-console.log("SCRIPT: script.js finished initial parsing."); // DIAGNOSTIC
+// Ensure the button is enabled from the start by not disabling it in JS
+// The disabled attribute was removed from index.html in Step 1.
+console.log("SCRIPT: script.js finished initial parsing.");
