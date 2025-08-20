@@ -3,13 +3,16 @@ console.log("--- script.js HAS STARTED EXECUTING ---"); // Diagnostic log at the
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-// NEW: Import TWEEN.js directly as an ES Module
-import * as TWEEN from './tween.esm.min.js'; // <<< CRITICAL: Points to your local ESM version
+// <<< THE CRITICAL CHANGE FOR TWEEN.JS >>>
+// Import TWEEN.js directly as an ES Module from your local file.
+// The `* as TWEEN` syntax means all exports from tween.esm.min.js will be available under the 'TWEEN' object.
+import * as TWEEN from './tween.esm.min.js'; 
+
 
 // --- Global variables for Three.js objects ---
 let scene, camera, renderer, controls, gridHelper, directionalLight;
 let currentModel = null;
-let isSceneInitialized = false;
+let isSceneInitialized = false; 
 
 const viewportContainer = document.getElementById('viewport-container');
 const loadModelBtn = document.getElementById('loadModelBtn');
@@ -41,6 +44,8 @@ const GRID_PRESETS = {
         colorGrid: 0x666666
     }
 };
+
+// --- Initialization functions (remain mostly same) ---
 
 function init() {
     console.log("INIT: Starting Three.js initialization.");
@@ -75,7 +80,7 @@ function init() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     scene.add(ambientLight);
 
-    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); 
     directionalLight.position.set(-0.8005, -10.1766, 12.2700);
     directionalLight.intensity = 4.0;
     directionalLight.castShadow = true;
@@ -105,7 +110,7 @@ function init() {
     isSceneInitialized = true;
     console.log("INIT: isSceneInitialized set to true.");
     if (loadModelBtn) {
-        loadModelBtn.disabled = false;
+        loadModelBtn.disabled = false; // <<< Enable the button
         console.log("INIT: Load Model button enabled.");
     } else {
         console.warn("INIT: loadModelBtn element not found!");
@@ -122,8 +127,7 @@ function init() {
 function animate() {
     requestAnimationFrame(animate);
     if (controls) controls.update();
-    // TWEEN is now imported, so no need for typeof check
-    TWEEN.update(); 
+    TWEEN.update(); // TWEEN is now directly imported, no typeof check needed
     if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
@@ -135,8 +139,7 @@ function onWindowResize() {
 }
 
 // --- Model Loading ---
-// GLTFLoader is imported at the top now
-const loader = new GLTFLoader(); // Instantiate directly
+const loader = new GLTFLoader(); // GLTFLoader is imported at the top now
 
 if (loadModelBtn) {
     loadModelBtn.addEventListener('click', () => {
@@ -193,7 +196,7 @@ function loadModel(url) {
         console.log("LOAD MODEL: Previous model removed.");
     }
 
-    loader.load( // Use the directly imported loader
+    loader.load(
         url,
         (gltf) => {
             currentModel = gltf.scene;
@@ -265,7 +268,6 @@ if (applyCameraAngleBtn) {
 }
 
 function applyCameraPreset(presetName) {
-    // TWEEN is now imported at the top, so it's always available
     if (!camera || !controls) { 
         console.warn("WARN: Camera or controls not initialized for camera preset.");
         return;
@@ -351,10 +353,10 @@ function updateSunDirection() {
 if (sunAzimuth) sunAzimuth.addEventListener('input', updateSunDirection);
 if (sunElevation) sunElevation.addEventListener('input', updateSunDirection);
 
-// Initial call to init() - now TWEEN is directly imported, so init can run immediately
-init(); // This is the first Three.js-related call after script parsing
+// <<< CRITICAL: Call init() directly as soon as the script parses.
+// All imports (Three.js and TWEEN.js) are handled by the module system at the top.
+init(); 
 console.log("SCRIPT: init() called from main script body.");
-
 
 // Set initial state of the button
 if (loadModelBtn) {
