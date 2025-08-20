@@ -1,12 +1,15 @@
-console.log("--- script.js HAS STARTED EXECUTING ---"); // <<< NEW DIAGNOSTIC LINE
+console.log("--- script.js HAS STARTED EXECUTING ---"); // Diagnostic log at the very top
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+// NEW: Import TWEEN.js directly as an ES Module
+import * as TWEEN from './tween.esm.min.js'; // <<< CRITICAL: Points to your local ESM version
 
 // --- Global variables for Three.js objects ---
 let scene, camera, renderer, controls, gridHelper, directionalLight;
 let currentModel = null;
+let isSceneInitialized = false;
 
 const viewportContainer = document.getElementById('viewport-container');
 const loadModelBtn = document.getElementById('loadModelBtn');
@@ -40,7 +43,7 @@ const GRID_PRESETS = {
 };
 
 function init() {
-    console.log("INIT: Starting initialization."); // DIAGNOSTIC
+    console.log("INIT: Starting Three.js initialization.");
     // Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111);
@@ -56,7 +59,7 @@ function init() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     viewportContainer.appendChild(renderer.domElement);
-    console.log("INIT: Renderer appended to viewport."); // DIAGNOSTIC
+    console.log("INIT: Renderer appended to viewport.");
 
     // Controls
     controls = new OrbitControls(camera, renderer.domElement);
@@ -72,14 +75,14 @@ function init() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     scene.add(ambientLight);
 
-    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // Create directional light
+    directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
     directionalLight.position.set(-0.8005, -10.1766, 12.2700);
     directionalLight.intensity = 4.0;
     directionalLight.castShadow = true;
     directionalLight.target.position.set(0, 0, 0);
     scene.add(directionalLight);
     scene.add(directionalLight.target);
-    console.log("INIT: Lights added."); // DIAGNOSTIC
+    console.log("INIT: Lights added.");
 
     // Configure shadow properties
     directionalLight.shadow.mapSize.width = 2048;
@@ -94,40 +97,54 @@ function init() {
 
     // Grid Helper
     addGridHelper('tiberianSun');
-    console.log("INIT: Grid helper added."); // DIAGNOSTIC
+    console.log("INIT: Grid helper added.");
 
     // Handle Window Resizing
     window.addEventListener('resize', onWindowResize, false);
 
+    isSceneInitialized = true;
+    console.log("INIT: isSceneInitialized set to true.");
+    if (loadModelBtn) {
+        loadModelBtn.disabled = false;
+        console.log("INIT: Load Model button enabled.");
+    } else {
+        console.warn("INIT: loadModelBtn element not found!");
+    }
+
     updateSunDirection();
-    console.log("INIT: updateSunDirection called."); // DIAGNOSTIC
+    console.log("INIT: updateSunDirection called.");
 
     // Initial Render
     animate();
-    console.log("INIT: Animation loop started."); // DIAGNOSTIC
+    console.log("INIT: Animation loop started.");
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    controls.update();
-    if (typeof TWEEN !== 'undefined') {
-        TWEEN.update();
-    }
-    renderer.render(scene, camera);
+    if (controls) controls.update();
+    // TWEEN is now imported, so no need for typeof check
+    TWEEN.update(); 
+    if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
 function onWindowResize() {
+    if (!camera || !renderer || !viewportContainer) return;
     camera.aspect = viewportContainer.clientWidth / viewportContainer.clientHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
 }
 
 // --- Model Loading ---
-const loader = new GLTFLoader();
+// GLTFLoader is imported at the top now
+const loader = new GLTFLoader(); // Instantiate directly
 
 if (loadModelBtn) {
     loadModelBtn.addEventListener('click', () => {
-        console.log("CLICK: Load Model button clicked."); // DIAGNOSTIC
+        if (!isSceneInitialized) {
+            console.warn("WARN: Scene not initialized yet. Cannot load model.");
+            return;
+        }
+        console.log("CLICK: Load Model button clicked. Scene is initialized.");
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.glb, .gltf';
@@ -145,16 +162,16 @@ if (loadModelBtn) {
         input.click();
     });
 } else {
-    console.warn("WARN: loadModelBtn element not found at script start."); // DIAGNOSTIC
+    console.warn("WARN: loadModelBtn element not found at script start.");
 }
 
 
 function loadModel(url) {
-    if (!scene) {
-        console.error("ERROR: Scene not available to load/remove model!");
+    if (!scene || !loader) { // Check for scene AND loader instance
+        console.error("ERROR: Scene or GLTFLoader not available to load model!");
         return;
     }
-    console.log("LOAD MODEL: Attempting to load model from URL:", url.substring(0, 50) + '...'); // DIAGNOSTIC
+    console.log("LOAD MODEL: Attempting to load model from URL:", url.substring(0, 50) + '...');
 
     if (currentModel) {
         scene.remove(currentModel);
@@ -173,14 +190,14 @@ function loadModel(url) {
             if (object.material && object.material.aoMap) object.material.aoMap.dispose();
         });
         currentModel = null;
-        console.log("LOAD MODEL: Previous model removed."); // DIAGNOSTIC
+        console.log("LOAD MODEL: Previous model removed.");
     }
 
-    loader.load(
+    loader.load( // Use the directly imported loader
         url,
         (gltf) => {
             currentModel = gltf.scene;
-            console.log("LOAD MODEL: GLTF loaded successfully."); // DIAGNOSTIC
+            console.log("LOAD MODEL: GLTF loaded successfully.");
 
             const box = new THREE.Box3().setFromObject(currentModel);
             const center = box.getCenter(new THREE.Vector3());
@@ -193,7 +210,7 @@ function loadModel(url) {
             const scaleFactor = targetSize / maxDim;
             currentModel.scale.setScalar(scaleFactor);
             currentModel.position.multiplyScalar(scaleFactor);
-            console.log("LOAD MODEL: Model centered and scaled."); // DIAGNOSTIC
+            console.log("LOAD MODEL: Model centered and scaled.");
 
             currentModel.traverse((node) => {
                 if (node.isMesh) {
@@ -201,10 +218,10 @@ function loadModel(url) {
                     node.receiveShadow = true;
                 }
             });
-            console.log("LOAD MODEL: Shadows enabled for model meshes."); // DIAGNOSTIC
+            console.log("LOAD MODEL: Shadows enabled for model meshes.");
 
             scene.add(currentModel);
-            console.log("LOAD MODEL: Model added to scene."); // DIAGNOSTIC
+            console.log("LOAD MODEL: Model added to scene.");
 
             box.setFromObject(currentModel);
             box.getCenter(center);
@@ -220,12 +237,12 @@ function loadModel(url) {
 
             controls.target.copy(center);
             controls.update();
-            console.log('LOAD MODEL: Camera framed model.'); // DIAGNOSTIC
+            console.log('LOAD MODEL: Camera framed model.');
 
-            console.log('Final Model Object:', currentModel); // DIAGNOSTIC: Log the actual THREE.Object3D
+            console.log('Final Model Object:', currentModel);
         },
         (xhr) => {
-            console.log('LOAD PROGRESS:', (xhr.loaded / xhr.total * 100).toFixed(2) + '% loaded'); // DIAGNOSTIC: More precise progress
+            console.log('LOAD PROGRESS:', (xhr.loaded / xhr.total * 100).toFixed(2) + '% loaded');
         },
         (error) => {
             console.error('ERROR: An error happened loading the model:', error);
@@ -241,14 +258,16 @@ const applyCameraAngleBtn = document.getElementById('applyCameraAngle');
 
 if (applyCameraAngleBtn) {
     applyCameraAngleBtn.addEventListener('click', () => {
+        if (!isSceneInitialized) { console.warn("WARN: Scene not initialized for camera angle."); return; }
         applyCameraPreset(cameraAngleSelect.value);
-        console.log("SETTINGS: Camera angle applied:", cameraAngleSelect.value); // DIAGNOSTIC
+        console.log("SETTINGS: Camera angle applied:", cameraAngleSelect.value);
     });
 }
 
 function applyCameraPreset(presetName) {
-    if (!camera || !controls || typeof TWEEN === 'undefined') { // Ensure TWEEN is also present
-        console.warn("WARN: Camera, controls, or TWEEN not initialized for camera preset.");
+    // TWEEN is now imported at the top, so it's always available
+    if (!camera || !controls) { 
+        console.warn("WARN: Camera or controls not initialized for camera preset.");
         return;
     }
     const preset = CAMERA_PRESETS[presetName];
@@ -270,8 +289,9 @@ const applyGridSizeBtn = document.getElementById('applyGridSize');
 
 if (applyGridSizeBtn) {
     applyGridSizeBtn.addEventListener('click', () => {
+        if (!isSceneInitialized) { console.warn("WARN: Scene not initialized for grid size."); return; }
         addGridHelper(gridSizeSelect.value);
-        console.log("SETTINGS: Grid size applied:", gridSizeSelect.value); // DIAGNOSTIC
+        console.log("SETTINGS: Grid size applied:", gridSizeSelect.value);
     });
 }
 
@@ -325,24 +345,22 @@ function updateSunDirection() {
     directionalLight.position.set(x, y, z);
     directionalLight.target.position.set(0,0,0);
     directionalLight.target.updateMatrixWorld();
-    console.log(`SETTINGS: Sun direction updated to Azimuth: ${azimuth}, Elevation: ${elevation}`); // DIAGNOSTIC
+    console.log(`SETTINGS: Sun direction updated to Azimuth: ${azimuth}, Elevation: ${elevation}`);
 }
 
 if (sunAzimuth) sunAzimuth.addEventListener('input', updateSunDirection);
 if (sunElevation) sunElevation.addEventListener('input', updateSunDirection);
 
+// Initial call to init() - now TWEEN is directly imported, so init can run immediately
+init(); // This is the first Three.js-related call after script parsing
+console.log("SCRIPT: init() called from main script body.");
 
-// --- TWEEN.js for smooth camera animation ---
-const script = document.createElement('script');
-script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.min.js';
-script.onload = () => {
-    console.log("TWEEN: TWEEN.js loaded successfully. Calling init().");
-    init(); // This is called *after* TWEEN is ready
-};
-script.onerror = () => {
-    console.error("ERROR: Failed to load TWEEN.js from CDN. Check network or URL.");
-    alert("Error: Core viewer components failed to load. Please check console.");
-};
-document.head.appendChild(script);
 
-console.log("SCRIPT: script.js finished initial parsing."); // DIAGNOSTIC
+// Set initial state of the button
+if (loadModelBtn) {
+    loadModelBtn.disabled = true; // Disabled initially
+    console.log("INITIAL: Load Model button set to disabled.");
+} else {
+    console.error("CRITICAL ERROR: loadModelBtn element not found on page load. Check index.html ID.");
+}
+console.log("SCRIPT: script.js finished initial parsing.");
