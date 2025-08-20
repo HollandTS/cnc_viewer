@@ -1,9 +1,9 @@
-console.log("--- script.js HAS STARTED EXECUTING ---");
+console.log("--- script.js HAS STARTED EXECUTING ---"); // Diagnostic log at the very top
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import * as TWEEN from './tween.esm.min.js'; 
+import * as TWEEN from './tween.esm.min.js'; // <<< This imports TWEEN.js from your local file
 
 
 // --- Global variables for Three.js objects ---
@@ -12,47 +12,38 @@ let currentModel = null;
 let isSceneInitialized = false; 
 
 const viewportContainer = document.getElementById('viewport-container');
-const loadModelBtn = document.getElementById('loadModelBtn'); 
+const loadModelBtn = document.getElementById('loadModelBtn'); // Get the button element reference
 
-// Camera Presets
+
+// Camera Presets - These define the *desired angle and distance relative to the model*
 const CAMERA_PRESETS = {
-    // NEW TIBERIAN SUN CAMERA PRESET (from your latest screenshot)
-    // The positions are based on the original Blender units.
-    // We will dynamically scale this position based on the loaded model's scale in the scene.
+    // Tiberian Sun - Aiming for a classic isometric RTS angle
     tiberianSun: {
-        // Blender Location (X, Y, Z): (1.79616, -1.78978, 1.73212)
-        // Blender Rotation (Quaternion WXYZ): (0.977, 0.000, 0.000, 0.214)
-        // Converting Blender Q(W,X,Y,Z) to Three.js Q(X,Y,Z,W): Q(0,0,0.214,0.977)
-        // This corresponds to a Z-rotation (around 25 degrees)
-        // For simplicity and direct control, we'll store the desired *relative* position and let a function
-        // place it correctly relative to the *scaled* model.
-        // Let's use the angles you want, rather than raw coordinates for this specific preset.
-        // We want a top-down, slightly isometric view, characteristic of TS.
-        // Assuming the model is centered at (0,0,0) after loading.
-        // Let's create a vector that represents the *direction* from the center for the camera.
-        // For a roughly 45-degree isometric view:
-        relativePositionVector: new THREE.Vector3(1, -1, 1).normalize(), // Example: isometric 45 deg angle
-        baseDistance: 50 // Base distance for calculation, will be scaled
+        // This vector defines the direction from the target (model center) to the camera
+        // A (1,1,1) direction gives a common isometric look in a Y-up system if scaled correctly.
+        positionOffset: new THREE.Vector3(1, 1, 1).normalize(), // Direction vector (e.g., top-right-front)
+        distanceRatio: 2.0, // Multiplier for model's largest dimension to set camera distance
+        // The rotation needed to look at the center from this offset position.
+        // -Math.atan(1 / Math.sqrt(2)) is approx -35.26 degrees (pitch down)
+        // Math.PI / 4 is 45 degrees (yaw to the right)
+        // 'YXZ' order means rotation around Y, then X, then Z. Common for game cameras.
+        rotation: new THREE.Euler(-Math.atan(1 / Math.sqrt(2)), Math.PI / 4, 0, 'YXZ') 
     },
+    // Red Alert 2 - Perhaps a slightly flatter, less vertical view
     redAlert2: {
-        relativePositionVector: new THREE.Vector3(1.2, -0.8, 1.2).normalize(), // More squashed isometric
-        baseDistance: 60
+        positionOffset: new THREE.Vector3(1, 0.8, 1).normalize(), // Slightly flatter angle
+        distanceRatio: 2.2, // Maybe slightly further out
+        rotation: new THREE.Euler(-Math.atan(1 / Math.sqrt(3)), Math.PI / 4, 0, 'YXZ') // Approx -30 degrees pitch
     }
 };
 
 // Grid Presets
 const GRID_PRESETS = {
-    // Tiberian Sun: Assuming 1 Blender unit = 1 Three.js unit
-    // Your previous request was Subdivisions: 10, Scale: 1.00 for Blender,
-    // which implies 10 subdivisions per 1 main unit.
-    // If our model is scaled to approx 50 units, a grid of 100x100 with 1000 divisions
-    // means cells are 0.1 x 0.1 units, and 10 of these make a 1x1 area.
-    // This seems consistent with high-detail grids for precise placement.
     tiberianSun: {
         size: 100,      // Total size of the grid (e.g., 100x100 units)
         divisions: 1000, // Number of divisions across the size (1000 divisions over 100 units = 0.1 unit per cell)
-        colorCenterLine: 0x444444, // Darker gray for center lines
-        colorGrid: 0x888888       // Lighter gray for grid lines
+        colorCenterLine: 0x444444, 
+        colorGrid: 0x888888       
     },
     redAlert2: {
         size: 150,
@@ -70,7 +61,7 @@ function init() {
     scene.background = new THREE.Color(0x111111);
 
     camera = new THREE.PerspectiveCamera(75, viewportContainer.clientWidth / viewportContainer.clientHeight, 0.1, 1000);
-    // Camera position will be set by applyCameraPreset (called after controls)
+    // Camera position will be set by applyCameraPreset (called AFTER controls)
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
@@ -87,11 +78,11 @@ function init() {
     controls.screenSpacePanning = false;
     controls.minDistance = 1;
     controls.maxDistance = 500;
-    controls.maxPolarAngle = Math.PI / 2;
+    controls.maxPolarAngle = Math.PI / 2; // Limit vertical rotation to prevent going below ground
     console.log("INIT: Controls set up.");
 
-    // Call camera preset AFTER controls are initialized, using a default target
-    applyCameraPreset('tiberianSun', new THREE.Vector3(0,0,0)); // Default lookAt target is origin
+    // Apply initial camera preset AFTER controls are initialized, looking at origin
+    applyCameraPreset('tiberianSun', new THREE.Vector3(0,0,0)); 
     console.log("INIT: Initial camera preset applied.");
 
     // Lights
@@ -99,12 +90,12 @@ function init() {
     scene.add(ambientLight);
 
     directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); 
-    directionalLight.position.set(-0.8005, -10.1766, 12.2700);
-    directionalLight.intensity = 4.0;
+    directionalLight.position.set(-0.8005, -10.1766, 12.2700); // Blender TS light position
+    directionalLight.intensity = 4.0; // Blender TS light strength
     directionalLight.castShadow = true;
-    directionalLight.target.position.set(0, 0, 0);
+    directionalLight.target.position.set(0, 0, 0); // Light points at the origin
     scene.add(directionalLight);
-    scene.add(directionalLight.target);
+    scene.add(directionalLight.target); // It's good practice to add target to scene
     console.log("INIT: Lights added.");
 
     // Configure shadow properties
@@ -128,7 +119,7 @@ function init() {
     isSceneInitialized = true;
     console.log("INIT: isSceneInitialized set to true.");
 
-    // Attach button listener and enable it here, AFTER init is complete
+    // Attach load model button listener and enable it here, AFTER init is complete
     if (loadModelBtn) {
         loadModelBtn.addEventListener('click', () => {
             if (!isSceneInitialized) { 
@@ -152,14 +143,13 @@ function init() {
             };
             input.click();
         });
-        loadModelBtn.disabled = false; // <<< Enable the button here
+        loadModelBtn.disabled = false; // Enable the button here
         console.log("INIT: Load Model button listener attached and enabled.");
     } else {
         console.error("INIT: loadModelBtn element not found!");
     }
 
-
-    updateSunDirection();
+    updateSunDirection(); // Update sun visuals based on current slider positions
     console.log("INIT: updateSunDirection called.");
 
     // Initial Render
@@ -221,14 +211,14 @@ function loadModel(url) {
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
 
-            currentModel.position.sub(center);
+            currentModel.position.sub(center); // Center the model at the origin
 
             const maxDim = Math.max(size.x, size.y, size.z);
-            const targetSize = 50; // Our scene's target size for loaded models
+            const targetSize = 50; // Our scene's target size for loaded models (e.g. 50x50x50 units)
             const scaleFactor = targetSize / maxDim;
             currentModel.scale.setScalar(scaleFactor);
-            // currentModel.position.multiplyScalar(scaleFactor); // Don't re-scale position after centering
-
+            // currentModel.position is already at 0,0,0 after centering, so no need to scale it again.
+            
             console.log("LOAD MODEL: Model centered and scaled. New scaleFactor:", scaleFactor);
 
             currentModel.traverse((node) => {
@@ -243,24 +233,10 @@ function loadModel(url) {
             console.log("LOAD MODEL: Model added to scene.");
 
             // Update controls target and camera position to frame the new model
-            // Make sure the camera still looks at the model's new center (0,0,0)
-            controls.target.set(0,0,0); // Model is centered at origin
-
-            // Recalculate camera position based on the new model's dimensions
-            // and the desired TS view angle, *relative* to the scaled model.
-            // Use the targetSize (50) as reference for the camera distance
-            const targetLookAt = new THREE.Vector3(0,0,0); // Camera will look at model's center
-            
-            // Adjust CAMERA_PRESETS to hold desired offset direction and scale
-            const preset = CAMERA_PRESETS['tiberianSun'];
-            const desiredDistance = preset.baseDistance * scaleFactor; // Scale distance by model's scale factor
-            
-            // Calculate new camera position
-            camera.position.copy(preset.relativePositionVector).multiplyScalar(desiredDistance).add(targetLookAt);
-            camera.lookAt(targetLookAt);
-
-            controls.update(); // Update controls to reflect new camera position and target
-            console.log('LOAD MODEL: Camera framed model with TS preset.');
+            const modelCenter = new THREE.Vector3(0,0,0); // Model is centered at origin
+            // Apply the currently selected camera preset to frame the new model
+            applyCameraPreset(cameraAngleSelect.value, modelCenter); 
+            console.log('LOAD MODEL: Camera framed model using current preset.');
 
             console.log('Final Model Object:', currentModel);
         },
@@ -282,8 +258,8 @@ const applyCameraAngleBtn = document.getElementById('applyCameraAngle');
 if (applyCameraAngleBtn) {
     applyCameraAngleBtn.addEventListener('click', () => {
         if (!isSceneInitialized) { console.warn("WARN: Scene not initialized for camera angle."); return; }
-        // When applying a preset from UI, we apply it relative to current model's center
-        const currentTarget = controls.target.clone(); // Get current target (model center)
+        // When applying a preset from UI, apply it relative to current model's center if loaded, else origin
+        const currentTarget = currentModel ? controls.target.clone() : new THREE.Vector3(0,0,0); 
         applyCameraPreset(cameraAngleSelect.value, currentTarget);
         console.log("SETTINGS: Camera angle applied:", cameraAngleSelect.value);
     });
@@ -297,31 +273,41 @@ function applyCameraPreset(presetName, targetPosition = new THREE.Vector3(0,0,0)
     }
     const preset = CAMERA_PRESETS[presetName];
     if (preset) {
-        // Calculate new position based on preset vector, base distance, and target
-        // If a model is loaded, use its maxDim or current scale for a better fit
-        let effectiveDistance = preset.baseDistance;
+        let modelMaxDim = 50; // Default size for camera distance calculation if no model
         if (currentModel) {
+            // Recalculate model's bounding box after our scaling
             const box = new THREE.Box3().setFromObject(currentModel);
             const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            // This is the model's actual size after our scaling.
-            // If it was scaled to 'targetSize = 50', then maxDim will be close to 50.
-            // So we don't need another 'scaleFactor' here, just use a multiple of maxDim or a fixed distance
-            effectiveDistance = maxDim * 1.5; // Example: 1.5 times the max dimension
-            if (effectiveDistance < preset.baseDistance) effectiveDistance = preset.baseDistance; // Ensure minimum distance
+            modelMaxDim = Math.max(size.x, size.y, size.z);
         }
         
-        const newPosition = preset.relativePositionVector.clone().multiplyScalar(effectiveDistance).add(targetPosition);
+        const desiredDistance = modelMaxDim * preset.distanceRatio;
+        const newPosition = preset.positionOffset.clone().multiplyScalar(desiredDistance).add(targetPosition);
 
+        // Animate camera position
         new TWEEN.Tween(camera.position)
             .to(newPosition, 1000)
             .easing(TWEEN.Easing.Quadratic.Out)
+            .start();
+
+        // Animate camera rotation (directly setting Euler angles)
+        // Create a temporary quaternion from the desired Euler rotation
+        const newQuaternion = new THREE.Quaternion().setFromEuler(preset.rotation);
+        
+        // Animate camera quaternion
+        new TWEEN.Tween(camera.quaternion)
+            .to({ _x: newQuaternion.x, _y: newQuaternion.y, _z: newQuaternion.z, _w: newQuaternion.w }, 1000)
+            .easing(TWEEN.Easing.Quadratic.Out)
             .onUpdate(() => {
-                camera.lookAt(targetPosition);
-                controls.target.copy(targetPosition);
+                camera.lookAt(targetPosition); // Keep camera looking at target during rotation
+                controls.target.copy(targetPosition); // Keep controls looking at target during rotation
                 controls.update();
             })
             .start();
+        
+        // Ensure controls target is explicitly set after animation starts
+        controls.target.copy(targetPosition);
+        controls.update(); 
     }
 }
 
@@ -396,11 +382,5 @@ if (sunElevation) sunElevation.addEventListener('input', updateSunDirection);
 init(); 
 console.log("SCRIPT: init() called from main script body.");
 
-// Set initial state of the button. This part is critical for enabling.
-// Note: The listener and disabled=false moved INTO init()
-if (loadModelBtn) { 
-    console.log("INITIAL: loadModelBtn element found during initial parse. Will be handled in init().");
-} else {
-    console.error("CRITICAL ERROR: loadModelBtn element not found on page load. Check index.html ID.");
-}
+// Final log message for script parsing completion.
 console.log("SCRIPT: script.js finished initial parsing.");
