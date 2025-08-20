@@ -10,7 +10,7 @@
     <div id="app-container">
         <div id="viewer-panel">
             <div id="viewer-header">
-                <!-- Button starts DISABLED -->
+                <!-- Button starts DISABLED by HTML attribute -->
                 <button id="loadModelBtn" disabled>Load GLB/GLTF Model</button>
             </div>
             <div id="viewport-container">
@@ -48,8 +48,9 @@
         </div>
     </div>
 
-    <!-- This is the correct way to load Three.js via CDN (using importmap) -->
+    <!-- This loads the ES Module Shims, which allows the importmap to work. -->
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <!-- The importmap defines how 'three' and 'three/addons/' are resolved. -->
     <script type="importmap">
         {
             "imports": {
@@ -58,7 +59,7 @@
             }
         }
     </script>
-    <!-- Our main script, loaded as a module. It will import TWEEN.js locally. -->
+    <!-- Your main script, loaded as a module. It will import TWEEN.js locally. -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
