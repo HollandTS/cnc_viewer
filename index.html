@@ -35,10 +35,73 @@
 
             <div class="setting-group">
                 <label>Sun Settings (Directional Light):</label>
-                <input type="range" id="sunAzimuth" min="0" max="360" value="45">
-                <label for="sunAzimuth">Azimuth (<span id="sunAzimuthValue">45</span>°)</label>
-                <input type="range" id="sunElevation" min="0" max="90" value="60">
-                <label for="sunElevation">Elevation (<span id="sunElevationValue">60</span>°)</label>
+                <input type="range" id="sunAzimuth" min="0" max="360" value="264">
+                <label for="sunAzimuth">Azimuth (<span id="sunAzimuthValue">264</span>°)</label>
+                <input type="range" id="sunElevation" min="0" max="90" value="50">
+                <label for="sunElevation">Elevation (<span id="sunElevationValue">50</span>°)</label>
+                <button id="resetSunBtn">Reset Sun (Blender)</button>
+            </div>
+            <div class="setting-group">
+                <label for="bgColorPicker">Background Color:</label>
+                <input type="color" id="bgColorPicker" value="#0000ff">
+                <label for="bgColorEnable">Enable</label>
+                <input type="checkbox" id="bgColorEnable">
+            </div>
+            <div class="setting-group">
+                <label>Transform Model:</label><br>
+                <label for="modelScale">Scale:</label>
+                <input type="range" id="modelScale" min="0.1" max="200" step="0.01" value="1">
+                <input type="number" id="modelScaleBox" min="0.1" max="200" step="0.01" value="1" style="width:60px;">
+                <br>
+                <label for="modelMoveX">Move X:</label>
+                <input type="range" id="modelMoveX" min="-200" max="200" step="0.1" value="0">
+                <input type="number" id="modelMoveXBox" min="-200" max="200" step="0.1" value="0" style="width:60px;">
+                <br>
+                <label for="modelMoveY">Move Y:</label>
+                <input type="range" id="modelMoveY" min="-200" max="200" step="0.1" value="0">
+                <input type="number" id="modelMoveYBox" min="-200" max="200" step="0.1" value="0" style="width:60px;">
+                <br>
+                <label for="modelMoveZ">Move Z:</label>
+                <input type="range" id="modelMoveZ" min="-200" max="200" step="0.1" value="0">
+                <input type="number" id="modelMoveZBox" min="-200" max="200" step="0.1" value="0" style="width:60px;">
+                <br>
+                <label for="modelRotX">Rotation X:</label>
+                <input type="range" id="modelRotX" min="0" max="360" step="1" value="0">
+                <input type="number" id="modelRotXBox" min="0" max="360" step="1" value="0" style="width:60px;">
+                <br>
+                <label for="modelRotY">Rotation Y:</label>
+                <input type="range" id="modelRotY" min="0" max="360" step="1" value="0">
+                <input type="number" id="modelRotYBox" min="0" max="360" step="1" value="0" style="width:60px;">
+                <br>
+                <label for="modelRotZ">Rotation Z:</label>
+                <input type="range" id="modelRotZ" min="0" max="360" step="1" value="0">
+                <input type="number" id="modelRotZBox" min="0" max="360" step="1" value="0" style="width:60px;">
+                <br>
+                <hr>
+                <label>Material Selection:</label><br>
+                <label for="matRough">Roughness:</label>
+                <input type="range" id="matRough" min="0" max="1" step="0.01" value="0.5">
+                <input type="number" id="matRoughBox" min="0" max="1" step="0.01" value="0.5" style="width:60px;">
+                <br>
+                <label for="matMetal">Metallic:</label>
+                <input type="range" id="matMetal" min="0" max="1" step="0.01" value="0.5">
+                <input type="number" id="matMetalBox" min="0" max="1" step="0.01" value="0.5" style="width:60px;">
+                <br>
+                <label for="matHue">Hue:</label>
+                <input type="range" id="matHue" min="0" max="360" step="1" value="0">
+                <input type="number" id="matHueBox" min="0" max="360" step="1" value="0" style="width:60px;">
+                <br>
+                <label for="matContrast">Contrast:</label>
+                <input type="range" id="matContrast" min="0" max="2" step="0.01" value="1">
+                <input type="number" id="matContrastBox" min="0" max="2" step="0.01" value="1" style="width:60px;">
+                <br>
+                <label for="matSharpness">Sharpness:</label>
+                <input type="range" id="matSharpness" min="0" max="2" step="0.01" value="1">
+                <input type="number" id="matSharpnessBox" min="0" max="2" step="0.01" value="1" style="width:60px;">
+                <br>
+                <label for="matBrightness">Brightness:</label>
+                <input type="range" id="matBrightness" min="0" max="2" step="0.01" value="1">
+                <input type="number" id="matBrightnessBox" min="0" max="2" step="0.01" value="1" style="width:60px;">
             </div>
         </div>
     </div>

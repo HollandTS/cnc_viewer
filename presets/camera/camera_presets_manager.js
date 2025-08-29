@@ -1,12 +1,11 @@
 // This manager will dynamically discover and load camera presets
-// Note: Dynamic imports (`import()`) often need explicit paths.
-// For GitHub Pages, relative paths are usually fine.
 
 const presetFiles = {
-    'tiberianSun': './presets/camera/tiberian_sun.js',
-    'redAlert2': './presets/camera/red_alert_2.js',
+    // FIX: Paths should be relative to the manager file's location
+    'tiberianSun': './tiberian_sun.js', // Changed from './presets/camera/tiberian_sun.js'
+    'redAlert2': './red_alert_2.js',    // Changed from './presets/camera/red_alert_2.js'
     // Add more camera presets here as you create their files:
-    // 'newPresetName': './presets/camera/new_preset_name.js',
+    // 'newPresetName': './new_preset_name.js',
 };
 
 let loadedPresets = {};

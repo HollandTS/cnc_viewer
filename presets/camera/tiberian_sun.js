@@ -1,8 +1,12 @@
-import * as THREE from 'three'; // Import Three.js if needed for Vector3, Euler, Quaternion
+// presets/camera/tiberian_sun.js
+import * as THREE from 'three';
 
 export default {
-    // Tiberian Sun camera preset (using Blender conversion attempt)
-    basePosition: new THREE.Vector3(1.79616, 1.73212, 1.78978),
-    positionScaleMultiplier: 10, // Adjust this value later for optimal framing
-    rotationQuaternion: new THREE.Quaternion(0.000, 0.000, 0.214, 0.977)
+    // Tiberian Sun camera preset (Blender exact match)
+    // Blender Camera Location: (110.0390, -110.0390, 89.8467)
+    position: new THREE.Vector3(110.039, -110.039, 89.8467),
+    // Blender Camera Rotation (Euler XYZ): (1.0472, 0.0000, 0.7854) radians
+    rotation: new THREE.Euler(1.0472, 0.0000, 0.7854, 'XYZ'),
+    // Orthographic scale from Blender
+    orthoScale: 37.4
 };

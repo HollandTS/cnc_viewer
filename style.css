@@ -55,7 +55,8 @@ body {
     background-color: #2b2b2b;
     padding: 20px;
     box-sizing: border-box;
-    overflow-y: auto; /* Allow scrolling if settings are too many */
+    overflow-y: auto; /* Always allow vertical scrolling */
+    max-height: 100vh;
 }
 
 #settings-panel h2 {

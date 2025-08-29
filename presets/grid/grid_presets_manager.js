@@ -1,8 +1,9 @@
 const presetFiles = {
-    'tiberianSun': './presets/grid/tiberian_sun.js',
-    'redAlert2': './presets/grid/red_alert_2.js',
+    // FIX: Paths should be relative to the manager file's location
+    'tiberianSun': './tiberian_sun.js', // Changed from './presets/grid/tiberian_sun.js'
+    'redAlert2': './red_alert_2.js',    // Changed from './presets/grid/red_alert_2.js'
     // Add more grid presets here:
-    // 'newPresetName': './presets/grid/new_preset_name.js',
+    // 'newPresetName': './new_preset_name.js',
 };
 
 let loadedPresets = {};
